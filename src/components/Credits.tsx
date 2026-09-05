@@ -22,12 +22,38 @@ export default function Credits() {
       </section>
 
       <section className="mt-10">
-        <h2 className="text-sm tracking-wide text-muted uppercase">Previsto para la fase 2</h2>
+        <h2 className="text-sm tracking-wide text-muted uppercase">Datos de los kanji</h2>
         <div className="mt-4 space-y-5 text-sm leading-relaxed">
           <Entry
-            title="KANJIDIC2 y JMdict"
+            title="KANJIDIC2"
+            license="Electronic Dictionary Research and Development Group · CC BY-SA 4.0"
+            text="Significados en español, lecturas on'yomi y kun'yomi, número de trazos, grado escolar y frecuencia en prensa. Los ficheros del diccionario son propiedad del EDRDG y se usan conforme a su licencia."
+          />
+          <Entry
+            title="Listas JLPT de Jonathan Waller"
+            license="JLPT Resources"
+            text="Reparto de los kanji entre los niveles N5 a N1, distribuidas a través del paquete kanji-data y kanjiapi.dev."
+          />
+          <Entry
+            title="Voces del sistema"
+            license="Web Speech API"
+            text="La pronunciación usa las voces japonesas instaladas en tu equipo (Kyoko en macOS; Haruka, Nanami o Ayumi en Windows). No se empaqueta audio."
+          />
+        </div>
+        <p className="mt-5 text-xs leading-relaxed text-muted">
+          Los 75 kanji que KANJIDIC2 no traduce al español —casi todos jōyō incorporados
+          en la revisión de 2010— se han traducido para esta aplicación a partir de sus
+          significados en inglés.
+        </p>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-sm tracking-wide text-muted uppercase">Previsto</h2>
+        <div className="mt-4 space-y-5 text-sm leading-relaxed">
+          <Entry
+            title="JMdict"
             license="Electronic Dictionary Research and Development Group"
-            text="Datos de kanji y vocabulario. Su licencia exige atribución visible, que se añadirá aquí al incorporarlos."
+            text="Vocabulario para fijar cada kanji dentro de palabras reales."
           />
           <Entry
             title="KanjiVG"
@@ -38,9 +64,11 @@ export default function Credits() {
       </section>
 
       <p className="mt-12 border-t border-line pt-6 text-xs leading-relaxed text-muted">
-        Las listas de kanji por nivel JLPT que usará la fase 2 son reconstrucciones de la
-        comunidad: la Japan Foundation dejó de publicar listas oficiales en 2010, y las
-        distintas versiones difieren entre sí en torno a un 10 %.
+        Las listas de kanji por nivel JLPT son reconstrucciones de la comunidad: la Japan
+        Foundation dejó de publicar listas oficiales en 2010, y las distintas versiones
+        difieren entre sí en torno a un 10 %. Los cinco niveles suman 2211 caracteres, a
+        los que se añaden los jōyō que ninguna lista recoge hasta cubrir el conjunto de
+        uso común.
       </p>
     </div>
   )

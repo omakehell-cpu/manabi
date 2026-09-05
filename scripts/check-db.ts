@@ -4,7 +4,7 @@
  *
  * Se ejecuta con `npm run check`, sin abrir Electron.
  */
-import { rmSync } from 'node:fs'
+import { readFileSync, rmSync } from 'node:fs'
 import { openDatabase, getQueue, gradeCard, getDeckStats, getOverview } from '../electron/db'
 
 const DB = process.env.CHECK_DB ?? '/tmp/manabi-check.db'
@@ -76,6 +76,81 @@ expect('programa al futuro', new Date(r.due).getTime() > Date.now(), (v) => v ==
 const o = getOverview()
 expect('repasos registrados', o.totalReviews, (v) => v > 0, 'la tabla review está vacía')
 expect('racha de un día', o.streak, (v) => v === 1, 'hoy cuenta como día activo')
+
+// ------------------------------------------------------------- kanji
+
+console.log('\nKanji: siembra')
+const kanjiDecks = getDeckStats().filter((d) => d.kind === 'kanji')
+for (const d of kanjiDecks) {
+  console.log(
+    `  ${d.slug.padEnd(9)} total ${String(d.total).padStart(4)}  bloqueadas ${String(d.locked).padStart(4)}  pendientes ${String(d.due).padStart(3)}`,
+  )
+}
+const n5 = kanjiDecks.find((d) => d.slug === 'kanji-n5')!
+// 79 kanji × 2 cartas (significado y lectura) + las palabras que introducen.
+expect('N5: 158 cartas de kanji + palabras', n5.total, (v) => v > 158, 'esperado 158 más las palabras')
+expect('N5 tiene palabras asociadas', n5.total - 158, (v) => v > 0, 'faltan las palabras de ejemplo')
+expect('N5 abierto de entrada', n5.due, (v) => v === 79, 'solo los significados')
+expect(
+  'niveles superiores cerrados',
+  kanjiDecks.filter((d) => d.slug !== 'kanji-n5').every((d) => d.due === 0),
+  (v) => v === true,
+  'N4–N1 no deben abrirse todavía',
+)
+
+const kq = getQueue('kanji-n5', 500)
+expect('solo significados', [...new Set(kq.map((c) => c.cardType))], (v) => v.length === 1 && v[0] === 'meaning', 'la lectura espera al significado')
+console.log('  primeros por frecuencia:', kq.slice(0, 10).map((c) => c.glyph).join(' '))
+
+console.log('\nAsentando los significados de N5…')
+for (let round = 0; round < 10; round++) {
+  const q = getQueue('kanji-n5', 500).filter((c) => c.cardType === 'meaning')
+  if (!q.length) break
+  for (const c of q) gradeCard(c.cardId, 4, 1500)
+}
+
+const kq2 = getQueue('kanji-n5', 500)
+expect('se abre la lectura', [...new Set(kq2.map((c) => c.cardType))], (v) => v.includes('reading'), 'tras el significado toca la lectura')
+const n4after = getDeckStats().find((d) => d.slug === 'kanji-n4')!
+expect('se abre N4', n4after.due, (v) => v > 0, 'N4 debe abrirse al 80 % de N5')
+const n3after = getDeckStats().find((d) => d.slug === 'kanji-n3')!
+expect('N3 sigue cerrado', n3after.due, (v) => v === 0, 'no debe saltarse un nivel')
+
+const n1 = getDeckStats().find((d) => d.slug === 'kanji-n1')!
+expect('N1 cerrado', n1.due, (v) => v === 0, 'aún queda mucho para N1')
+
+console.log('\nKanji: palabras')
+const wordsBefore = getQueue('kanji-n5', 999).filter((c) => c.cardType === 'word')
+expect('sin palabras todavía', wordsBefore.length, (v) => v === 0, 'las palabras esperan a la lectura')
+
+console.log('Asentando también las lecturas de N5…')
+for (let round = 0; round < 10; round++) {
+  const q = getQueue('kanji-n5', 999).filter((c) => c.cardType === 'reading')
+  if (!q.length) break
+  for (const c of q) gradeCard(c.cardId, 4, 1500)
+}
+
+const wordsAfter = getQueue('kanji-n5', 999).filter((c) => c.cardType === 'word')
+expect('se abren las palabras', wordsAfter.length, (v) => v > 0, 'tras dominar el kanji aislado')
+console.log('  ejemplos:', wordsAfter.slice(0, 8).map((c) => `${c.glyph}(${c.reading})`).join(' '))
+
+// Ninguna palabra puede exigir un kanji que aún no toca.
+const openKanji = new Set(
+  getQueue('kanji-n5', 999)
+    .concat(getQueue('kanji-n4', 999))
+    .map((c) => c.glyph),
+)
+const n5Kanji = new Set(
+  (JSON.parse(readFileSync('src/data/kanji.json', 'utf8')) as { k: string; l: number }[])
+    .filter((r) => r.l === 5)
+    .map((r) => r.k),
+)
+const leaky = wordsAfter.filter((c) =>
+  [...c.glyph].some((ch) => /[\u4e00-\u9fff]/.test(ch) && !n5Kanji.has(ch)),
+)
+expect('ninguna usa kanji de niveles posteriores', leaky.length, (v) => v === 0,
+  leaky.length ? `p. ej. ${leaky[0].glyph}` : '')
+void openKanji
 
 console.log(failures === 0 ? '\nTodo correcto\n' : `\n${failures} comprobación(es) fallida(s)\n`)
 process.exit(failures === 0 ? 0 : 1)

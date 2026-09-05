@@ -12,7 +12,9 @@
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:win": "npm run build && electron-builder --win",
     "preview": "vite preview",
-    "check": "vite build --config vite.check.config.mts && node dist-check/check-db.cjs"
+    "check": "vite build --config vite.check.config.mts && node dist-check/check-db.cjs",
+    "data:kanji": "node --experimental-strip-types scripts/build-kanji.ts",
+    "data:words": "node --max-old-space-size=4096 --experimental-strip-types scripts/build-kanji-words.ts"
   },
   "dependencies": {
     "@fontsource/noto-sans-jp": "^5.3.0",

@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { StudyCard } from '../types'
 import { checkAnswer, toTargetKana, type CheckMode } from '../lib/answer'
+import { cleanReading } from '../lib/speech'
+import Speaker from './Speaker'
+
+/** Detalle que se despliega al responder una carta de kanji. */
+interface KanjiDetail {
+  on: string[]
+  kun: string[]
+  meanings: string[]
+  strokes: number
+}
 
 interface Prompt {
   /** Lo que se muestra en grande. */
@@ -12,6 +22,10 @@ interface Prompt {
   expected: string
   alternatives: string[]
   placeholder: string
+  /** Texto que se puede escuchar una vez respondida la carta. */
+  audio?: string
+  kanji?: KanjiDetail
+  word?: { reading: string; meaning: string }
 }
 
 function buildPrompt(card: StudyCard): Prompt {
@@ -21,6 +35,58 @@ function buildPrompt(card: StudyCard): Prompt {
   } catch {
     parsed = []
   }
+
+  if (card.deckKind === 'kanji' && card.cardType === 'word') {
+    // Fijar el kanji dentro de una palabra: se pide la lectura, que es
+    // justo lo que cambia según el compuesto (生 es セイ en 学生 y い en
+    // 生きる). El significado se revela después, como refuerzo.
+    return {
+      stimulus: card.glyph,
+      stimulusIsJapanese: true,
+      question: '¿Cómo se lee esta palabra?',
+      mode: 'reading',
+      expected: card.reading,
+      alternatives: [card.reading],
+      placeholder: 'teclea en rōmaji',
+      audio: card.glyph,
+      word: { reading: card.reading, meaning: card.meaning ?? '' },
+    }
+  }
+
+  if (card.deckKind === 'kanji') {
+    const k = parsed as { on: string[]; kun: string[]; meanings: string[]; strokes: number }
+    const detail: KanjiDetail = {
+      on: k.on ?? [],
+      kun: k.kun ?? [],
+      meanings: k.meanings ?? [],
+      strokes: k.strokes ?? 0,
+    }
+    const readings = [...detail.on, ...detail.kun]
+
+    if (card.cardType === 'reading') {
+      return {
+        stimulus: card.glyph,
+        stimulusIsJapanese: true,
+        question: '¿Cómo se lee? (vale cualquier lectura)',
+        mode: 'reading',
+        expected: readings[0] ?? '',
+        alternatives: readings,
+        placeholder: 'teclea en rōmaji',
+        kanji: detail,
+      }
+    }
+    return {
+      stimulus: card.glyph,
+      stimulusIsJapanese: true,
+      question: '¿Qué significa?',
+      mode: 'meaning',
+      expected: detail.meanings[0] ?? card.meaning ?? '',
+      alternatives: detail.meanings,
+      placeholder: 'significado en español',
+      kanji: detail,
+    }
+  }
+
   const kanaAlts = Array.isArray(parsed) ? (parsed as string[]) : []
   const vocabAlts = (parsed ?? {}) as { reading?: string[]; meaning?: string[] }
 
@@ -34,6 +100,7 @@ function buildPrompt(card: StudyCard): Prompt {
         expected: card.meaning ?? '',
         alternatives: vocabAlts.meaning ?? [],
         placeholder: 'significado en español',
+        audio: card.glyph,
       }
     }
     return {
@@ -44,6 +111,7 @@ function buildPrompt(card: StudyCard): Prompt {
       expected: card.reading,
       alternatives: vocabAlts.reading ?? [],
       placeholder: 'rōmaji',
+      audio: card.glyph,
     }
   }
 
@@ -57,6 +125,7 @@ function buildPrompt(card: StudyCard): Prompt {
       expected: card.glyph,
       alternatives: kanaAlts,
       placeholder: 'teclea en rōmaji, se convierte solo',
+      audio: card.glyph,
     }
   }
   return {
@@ -67,6 +136,7 @@ function buildPrompt(card: StudyCard): Prompt {
     expected: card.reading,
     alternatives: kanaAlts,
     placeholder: 'rōmaji',
+    audio: card.glyph,
   }
 }
 
@@ -158,9 +228,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
     inputRef.current?.focus()
   }, [index, phase, queue])
 
-  if (!queue) {
-    return <Centered>Cargando…</Centered>
-  }
+  if (!queue) return <Centered>Cargando…</Centered>
 
   if (queue.length === 0) {
     return (
@@ -198,8 +266,8 @@ export default function Study({ deck, deckName, onExit }: Props) {
     )
   }
 
-  const done = index
-  const progress = (done / queue.length) * 100
+  const answered = phase !== 'asking'
+  const progress = (index / queue.length) * 100
 
   return (
     <div className="flex h-full flex-col">
@@ -210,7 +278,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
           </button>
         </div>
         <div className="text-sm tabular-nums text-muted">
-          {done} / {queue.length}
+          {index} / {queue.length}
         </div>
       </header>
 
@@ -222,11 +290,11 @@ export default function Study({ deck, deckName, onExit }: Props) {
       </div>
 
       <main className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-6 py-8">
-        <p className="mb-8 text-sm tracking-wide text-muted uppercase">{prompt.question}</p>
+        <p className="mb-6 text-sm tracking-wide text-muted uppercase">{prompt.question}</p>
 
         <div
           key={card.cardId}
-          className={`pop mb-10 ${prompt.stimulusIsJapanese ? 'jp' : 'font-mono'} ${
+          className={`pop mb-8 ${prompt.stimulusIsJapanese ? 'jp' : 'font-mono'} ${
             prompt.stimulusIsJapanese
               ? prompt.stimulus.length > 3
                 ? 'text-7xl'
@@ -242,7 +310,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
             ref={inputRef}
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            disabled={phase !== 'asking'}
+            disabled={answered}
             spellCheck={false}
             autoComplete="off"
             placeholder={prompt.placeholder}
@@ -255,18 +323,19 @@ export default function Study({ deck, deckName, onExit }: Props) {
             }`}
           />
 
-          {livePreview && phase === 'asking' && (
+          {livePreview && !answered && (
             <p className="jp mt-3 text-center text-3xl text-muted">{livePreview}</p>
           )}
 
-          {phase === 'wrong' && (
+          {phase === 'wrong' && !prompt.kanji && !prompt.word && (
             <div className="mt-5 rounded-xl bg-accent-soft px-5 py-4 text-center">
               <p className="text-xs tracking-wide text-muted uppercase">Respuesta</p>
-              <p
-                className={`mt-1 text-3xl ${prompt.mode === 'kana' ? 'jp' : ''}`}
-              >
-                {prompt.expected}
-              </p>
+              <div className="mt-1 flex items-center justify-center gap-2">
+                <p className={`text-3xl ${prompt.mode === 'kana' ? 'jp' : ''}`}>
+                  {prompt.expected}
+                </p>
+                {prompt.audio && <Speaker text={prompt.audio} size="md" />}
+              </div>
               {prompt.alternatives.length > 0 && (
                 <p className="mt-2 text-sm text-muted">
                   también válido: {prompt.alternatives.join(', ')}
@@ -275,10 +344,33 @@ export default function Study({ deck, deckName, onExit }: Props) {
             </div>
           )}
 
+          {phase === 'right' && prompt.audio && !prompt.word && (
+            <div className="mt-4 flex items-center justify-center gap-2 text-muted">
+              <span className="jp text-2xl text-fg">{card.glyph}</span>
+              <Speaker text={prompt.audio} size="md" />
+            </div>
+          )}
+
+          {answered && prompt.kanji && (
+            <KanjiPanel detail={prompt.kanji} failed={phase === 'wrong'} />
+          )}
+
+          {answered && prompt.word && (
+            <div
+              className={`mt-5 rounded-xl px-5 py-4 text-center ${
+                phase === 'wrong' ? 'bg-accent-soft' : 'border border-line bg-surface'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <p className="jp text-3xl">{prompt.word.reading}</p>
+                <Speaker text={card.glyph} size="md" />
+              </div>
+              <p className="mt-2 text-lg text-muted">{prompt.word.meaning}</p>
+            </div>
+          )}
+
           <div className="mt-6 flex h-12 items-center justify-center gap-3">
-            {phase === 'asking' && (
-              <span className="text-sm text-muted">Intro para responder</span>
-            )}
+            {!answered && <span className="text-sm text-muted">Intro para responder</span>}
             {phase === 'right' && (
               <>
                 <Key onClick={() => void regrade(2)} label="Costó" hint="2" />
@@ -290,6 +382,44 @@ export default function Study({ deck, deckName, onExit }: Props) {
           </div>
         </div>
       </main>
+    </div>
+  )
+}
+
+/**
+ * Ficha del kanji tras responder. Se muestra tanto al acertar como al
+ * fallar: es el momento en que de verdad se aprende, y un kanji tiene más
+ * de lo que cabe en una respuesta.
+ */
+function KanjiPanel({ detail, failed }: { detail: KanjiDetail; failed: boolean }) {
+  return (
+    <div
+      className={`mt-5 rounded-xl px-5 py-4 ${failed ? 'bg-accent-soft' : 'bg-surface border border-line'}`}
+    >
+      <p className="text-center text-lg">{detail.meanings.join(', ')}</p>
+      <div className="mt-4 space-y-2">
+        {detail.on.length > 0 && <ReadingRow label="ON" readings={detail.on} />}
+        {detail.kun.length > 0 && <ReadingRow label="KUN" readings={detail.kun} />}
+      </div>
+      {detail.strokes > 0 && (
+        <p className="mt-3 text-center text-xs text-muted">{detail.strokes} trazos</p>
+      )}
+    </div>
+  )
+}
+
+function ReadingRow({ label, readings }: { label: string; readings: string[] }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="mt-1.5 w-8 shrink-0 text-xs tracking-wide text-muted">{label}</span>
+      <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
+        {readings.map((r) => (
+          <span key={r} className="flex items-center rounded-md bg-raised/60 pl-2">
+            <span className="jp text-lg">{r}</span>
+            <Speaker text={cleanReading(r)} label={r} />
+          </span>
+        ))}
+      </div>
     </div>
   )
 }

@@ -1,4 +1,14 @@
+import { useState } from 'react'
 import type { Overview } from '../types'
+import {
+  japaneseVoices,
+  preferredVoice,
+  setPreferredVoice,
+  speak,
+  speechRate,
+  setSpeechRate,
+} from '../lib/speech'
+import { useVoicesReady } from './Speaker'
 
 interface Props {
   overview: Overview
@@ -74,6 +84,8 @@ export default function Stats({ overview, onExport, onReset }: Props) {
         </>
       )}
 
+      <VoiceSettings />
+
       <h2 className="mt-12 text-sm tracking-wide text-muted uppercase">Datos</h2>
       <div className="mt-4 flex gap-3">
         <button
@@ -102,5 +114,81 @@ function Tile({ value, label }: { value: number | string; label: string }) {
       <p className="text-3xl font-medium tabular-nums">{value}</p>
       <p className="mt-1 text-sm text-muted">{label}</p>
     </div>
+  )
+}
+
+/**
+ * La pronunciación usa las voces del sistema. Si no hay ninguna japonesa
+ * instalada se explica cómo añadirla en lugar de callar: el usuario vería
+ * desaparecer los botones de audio sin saber por qué.
+ */
+function VoiceSettings() {
+  const ready = useVoicesReady()
+  const voices = japaneseVoices()
+  const [voice, setVoice] = useState(() => preferredVoice()?.name ?? '')
+  const [rate, setRate] = useState(speechRate)
+
+  return (
+    <>
+      <h2 className="mt-12 text-sm tracking-wide text-muted uppercase">Pronunciación</h2>
+      {!ready ? (
+        <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted">
+          No hay ninguna voz japonesa instalada en el sistema, así que los botones de
+          audio no aparecen. En macOS se añaden en Ajustes del Sistema → Accesibilidad →
+          Contenido hablado → Voz del sistema → Gestionar voces. En Windows, en
+          Configuración → Hora e idioma → Idioma → Añadir japonés con la voz incluida.
+        </p>
+      ) : (
+        <div className="mt-4 space-y-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <label htmlFor="voz" className="w-24 text-sm text-muted">
+              Voz
+            </label>
+            <select
+              id="voz"
+              value={voice}
+              onChange={(e) => {
+                setVoice(e.target.value)
+                setPreferredVoice(e.target.value)
+              }}
+              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-muted"
+            >
+              {voices.map((v) => (
+                <option key={v.name} value={v.name}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => speak('こんにちは')}
+              className="rounded-lg bg-raised px-4 py-2 text-sm hover:bg-line"
+            >
+              Probar
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <label htmlFor="vel" className="w-24 text-sm text-muted">
+              Velocidad
+            </label>
+            <input
+              id="vel"
+              type="range"
+              min={0.5}
+              max={1.5}
+              step={0.1}
+              value={rate}
+              onChange={(e) => {
+                const v = Number(e.target.value)
+                setRate(v)
+                setSpeechRate(v)
+              }}
+              className="w-48 accent-[var(--color-accent)]"
+            />
+            <span className="text-sm tabular-nums text-muted">{rate.toFixed(1)}×</span>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

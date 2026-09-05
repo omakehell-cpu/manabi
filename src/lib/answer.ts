@@ -1,4 +1,5 @@
-import { toKana, toKatakana } from 'wanakana'
+import { toHiragana, toKana, toKatakana } from 'wanakana'
+import { cleanReading } from './speech'
 
 /**
  * Normalización para comparar respuestas escritas.
@@ -25,7 +26,7 @@ function meaningForms(text: string): string[] {
   return [n, n.replace(LEADING_ARTICLES, '')]
 }
 
-export type CheckMode = 'romaji' | 'kana' | 'meaning'
+export type CheckMode = 'romaji' | 'kana' | 'meaning' | 'reading'
 
 export interface CheckResult {
   correct: boolean
@@ -39,6 +40,15 @@ export function checkAnswer(
   alternatives: string[],
   mode: CheckMode,
 ): CheckResult {
+  if (mode === 'reading') {
+    // Lectura de un kanji: vale cualquiera de sus on'yomi o kun'yomi. Se
+    // compara todo en hiragana porque el on'yomi se escribe en katakana
+    // (ニチ) y wanakana produce hiragana desde el rōmaji (にち).
+    const submitted = toHiragana(toKana(raw.trim()))
+    const accepted = alternatives.map((r) => toHiragana(cleanReading(r)))
+    return { correct: accepted.includes(submitted), submitted }
+  }
+
   if (mode === 'kana') {
     // El usuario teclea rōmaji y wanakana lo convierte; se compara kana con kana.
     const submitted = toTargetKana(raw, expected)

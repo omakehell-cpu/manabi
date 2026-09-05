@@ -5,8 +5,35 @@ import { fsrs, generatorParameters, State, type Card, type Grade } from 'ts-fsrs
 import { HIRAGANA, KATAKANA } from '../src/data/kana'
 import { VOCAB } from '../src/data/vocab'
 import { tokenizeKana } from '../src/lib/tokenize'
+import KANJI from '../src/data/kanji.json'
+import KANJI_WORDS from '../src/data/kanji-words.json'
 
-export type CardType = 'recognition' | 'recall' | 'reading'
+export type CardType = 'recognition' | 'recall' | 'reading' | 'meaning' | 'word'
+
+/** Forma de cada registro en src/data/kanji.json (ver scripts/build-kanji.ts). */
+interface KanjiJson {
+  k: string
+  l: number
+  x: 0 | 1
+  m: string[]
+  on: string[]
+  kun: string[]
+  s: number
+  f: number
+  g: number
+}
+
+/** Forma de cada registro en src/data/kanji-words.json. */
+interface KanjiWordJson {
+  /** La palabra escrita. */
+  w: string
+  /** Su lectura en kana. */
+  r: string
+  /** Traducción al español. */
+  m: string
+  /** Kanji al que pertenece: el último de la palabra en el orden de estudio. */
+  k: string
+}
 
 /** Un ítem se considera asentado cuando FSRS lo saca de aprendizaje. */
 const MATURE = State.Review
@@ -31,10 +58,19 @@ export function openDatabase(file: string): Database.Database {
 
 // ---------------------------------------------------------------- seed
 
+/** Los niveles JLPT van de N5 (más fácil) a N1. */
+export const KANJI_LEVELS = [5, 4, 3, 2, 1] as const
+
 const DECKS = [
   { kind: 'hiragana', slug: 'hiragana', name: 'Hiragana', position: 0 },
   { kind: 'katakana', slug: 'katakana', name: 'Katakana', position: 1 },
   { kind: 'vocab', slug: 'vocab', name: 'Vocabulario en kana', position: 2 },
+  ...KANJI_LEVELS.map((n, i) => ({
+    kind: 'kanji',
+    slug: `kanji-n${n}`,
+    name: `Kanji N${n}`,
+    position: 3 + i,
+  })),
 ]
 
 function seed(): void {
@@ -99,6 +135,75 @@ function seed(): void {
       })
     }
 
+    // Kanji: significado (漢→«China») y lectura (漢→カン/から).
+    // La lectura nace bloqueada hasta asentar el significado, y todo lo que
+    // no sea N5 espera a que el nivel anterior esté hecho.
+    for (const level of KANJI_LEVELS) {
+      const id = deckId(`kanji-n${level}`)
+      const rows = (KANJI as KanjiJson[]).filter((r) => r.l === level)
+      rows.forEach((r, i) => {
+        insertItem.run({
+          deck_id: id,
+          glyph: r.k,
+          reading: [...r.on, ...r.kun].join('、'),
+          alt: JSON.stringify({
+            on: r.on,
+            kun: r.kun,
+            meanings: r.m,
+            strokes: r.s,
+            freq: r.f,
+            grade: r.g,
+          }),
+          meaning: r.m[0],
+          // Los jōyō que ninguna lista JLPT recoge se estudian al final de N1.
+          block: r.x ? 'joyo-extra' : 'jlpt',
+          row_key: `n${level}`,
+          position: i,
+        })
+        const itemId = (
+          db.prepare('SELECT id FROM item WHERE deck_id = ? AND glyph = ?').get(id, r.k) as {
+            id: number
+          }
+        ).id
+        insertCard.run({
+          item_id: itemId,
+          card_type: 'meaning',
+          due: now,
+          locked: level === 5 && !r.x ? 0 : 1,
+        })
+        insertCard.run({ item_id: itemId, card_type: 'reading', due: now, locked: 1 })
+      })
+    }
+
+    // Palabras de ejemplo: la fase de «fijar en palabras». Cada una vive en
+    // el mazo del kanji que la introduce y nace bloqueada hasta que ese
+    // kanji está aprendido de forma aislada.
+    {
+      const levelOf = new Map((KANJI as KanjiJson[]).map((r) => [r.k, r.l]))
+      const words = KANJI_WORDS as KanjiWordJson[]
+      words.forEach((w, i) => {
+        const level = levelOf.get(w.k)
+        if (!level) return
+        const id = deckId(`kanji-n${level}`)
+        insertItem.run({
+          deck_id: id,
+          glyph: w.w,
+          reading: w.r,
+          alt: JSON.stringify({ owner: w.k }),
+          meaning: w.m,
+          block: 'word',
+          row_key: w.k,
+          position: 10000 + i,
+        })
+        const itemId = (
+          db.prepare('SELECT id FROM item WHERE deck_id = ? AND glyph = ?').get(id, w.w) as
+            | { id: number }
+            | undefined
+        )?.id
+        if (itemId) insertCard.run({ item_id: itemId, card_type: 'word', due: now, locked: 1 })
+      })
+    }
+
     // Vocabulario: reconocimiento (palabra→significado) y lectura (palabra→rōmaji).
     // Ambas nacen bloqueadas hasta dominar los kana que componen la palabra.
     const vid = deckId('vocab')
@@ -137,9 +242,12 @@ function seed(): void {
  *     está asentado: primero reconocer, después producir.
  *  3. Una palabra se abre cuando TODOS los kana que la componen están
  *     asentados — nunca ves ねこ antes de dominar ね y こ.
- *
- * Es el mismo mecanismo que gobernará «kanji aislado → kanji en palabra»
- * en la fase 2; por eso vive en un único sitio.
+ *  4. Los niveles de kanji se abren en cadena: N4 espera al 80 % de N5, y
+ *     así hasta N1. Los jōyō fuera de las listas JLPT cierran N1.
+ *  5. En cada kanji, la lectura espera al significado: primero sabes qué
+ *     quiere decir 漢, después cómo suena.
+ *  6. Las palabras de un kanji esperan a que ese kanji esté aprendido
+ *     aislado — el «primero aislados, después en palabras».
  */
 export function refreshLocks(): void {
   const unlock = db.prepare('UPDATE card SET locked = 0 WHERE id = ? AND locked = 1')
@@ -186,6 +294,71 @@ export function refreshLocks(): void {
       `UPDATE card SET locked = 0
        WHERE card_type = 'recall' AND locked = 1 AND item_id IN (
          SELECT item_id FROM card WHERE card_type = 'recognition' AND state >= ?)`,
+    ).run(MATURE)
+
+    // Regla 4 — cada nivel de kanji espera al anterior.
+    for (let i = 1; i < KANJI_LEVELS.length; i++) {
+      const prev = KANJI_LEVELS[i - 1]
+      const stats = db
+        .prepare(
+          `SELECT COUNT(*) AS total, SUM(CASE WHEN c.state >= ? THEN 1 ELSE 0 END) AS done
+           FROM card c JOIN item i ON i.id = c.item_id JOIN deck d ON d.id = i.deck_id
+           WHERE d.slug = ? AND c.card_type = 'meaning' AND i.block = 'jlpt'`,
+        )
+        .get(MATURE, `kanji-n${prev}`) as { total: number; done: number | null }
+
+      if (!stats.total) continue
+      if ((stats.done ?? 0) / stats.total < BLOCK_THRESHOLD) break
+
+      db.prepare(
+        `UPDATE card SET locked = 0
+         WHERE card_type = 'meaning' AND locked = 1 AND item_id IN (
+           SELECT i.id FROM item i JOIN deck d ON d.id = i.deck_id
+           WHERE d.slug = ? AND i.block = 'jlpt')`,
+      ).run(`kanji-n${KANJI_LEVELS[i]}`)
+    }
+
+    // Los jōyō que ninguna lista JLPT recoge cierran N1, una vez hecho el resto.
+    {
+      const stats = db
+        .prepare(
+          `SELECT COUNT(*) AS total, SUM(CASE WHEN c.state >= ? THEN 1 ELSE 0 END) AS done
+           FROM card c JOIN item i ON i.id = c.item_id JOIN deck d ON d.id = i.deck_id
+           WHERE d.slug = 'kanji-n1' AND c.card_type = 'meaning' AND i.block = 'jlpt'`,
+        )
+        .get(MATURE) as { total: number; done: number | null }
+      if (stats.total && (stats.done ?? 0) / stats.total >= BLOCK_THRESHOLD) {
+        db.prepare(
+          `UPDATE card SET locked = 0
+           WHERE card_type = 'meaning' AND locked = 1 AND item_id IN (
+             SELECT i.id FROM item i JOIN deck d ON d.id = i.deck_id
+             WHERE d.kind = 'kanji' AND i.block = 'joyo-extra')`,
+        ).run()
+      }
+    }
+
+    // Regla 5 — en cada kanji, la lectura espera al significado.
+    db.prepare(
+      `UPDATE card SET locked = 0
+       WHERE card_type = 'reading' AND locked = 1 AND item_id IN (
+         SELECT c.item_id FROM card c JOIN item i ON i.id = c.item_id
+         JOIN deck d ON d.id = i.deck_id
+         WHERE d.kind = 'kanji' AND c.card_type = 'meaning' AND c.state >= ?)`,
+    ).run(MATURE)
+
+    // Regla 6 — una palabra de kanji espera a que su kanji esté aprendido
+    // aislado: primero sabes qué significa y cómo se lee 地, después lo
+    // reconoces dentro de 地下. Los demás kanji de la palabra ya están
+    // vistos por construcción, porque el generador solo admite palabras
+    // cuyos caracteres pertenezcan todos a niveles anteriores o al propio.
+    db.prepare(
+      `UPDATE card SET locked = 0
+       WHERE card_type = 'word' AND locked = 1 AND item_id IN (
+         SELECT w.id FROM item w
+         JOIN item k ON k.glyph = w.row_key
+         JOIN deck kd ON kd.id = k.deck_id AND kd.kind = 'kanji'
+         JOIN card c ON c.item_id = k.id AND c.card_type = 'reading'
+         WHERE w.block = 'word' AND c.state >= ?)`,
     ).run(MATURE)
 
     // Regla 3 — palabras, solo si todos sus kana están asentados.
@@ -343,6 +516,8 @@ export interface DeckStats {
   learning: number
   review: number
   suspended: number
+  /** Ítems que son caracteres o signos, excluidas las palabras de ejemplo. */
+  characters: number
 }
 
 export function getDeckStats(): DeckStats[] {
@@ -355,7 +530,8 @@ export function getDeckStats(): DeckStats[] {
               SUM(CASE WHEN c.locked = 0 AND c.state = 0 THEN 1 ELSE 0 END) AS New,
               SUM(CASE WHEN c.state IN (1,3) THEN 1 ELSE 0 END) AS learning,
               SUM(CASE WHEN c.state = 2 THEN 1 ELSE 0 END) AS review,
-              SUM(c.suspended) AS suspended
+              SUM(c.suspended) AS suspended,
+              COUNT(DISTINCT CASE WHEN i.block != 'word' THEN i.id END) AS characters
        FROM deck d
        LEFT JOIN item i ON i.deck_id = d.id
        LEFT JOIN card c ON c.item_id = i.id

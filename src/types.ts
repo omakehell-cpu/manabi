@@ -1,4 +1,4 @@
-export type CardType = 'recognition' | 'recall' | 'reading'
+export type CardType = 'recognition' | 'recall' | 'reading' | 'meaning' | 'word'
 
 export interface StudyCard {
   cardId: number
@@ -26,6 +26,7 @@ export interface DeckStats {
   learning: number
   review: number
   suspended: number
+  characters: number
 }
 
 export interface Overview {

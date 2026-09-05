@@ -225,10 +225,27 @@ programación FSRS y las tres reglas de desbloqueo sin abrir Electron.
   japonés muestra cuadros vacíos, y varias fuentes CJK del sistema dibujan
   los glifos con formas chinas en lugar de japonesas.
 
+### El icono
+
+`build/icon.png` se genera con el propio Electron, que ya está instalado y
+es un motor de renderizado completo — no hace falta ninguna herramienta de
+diseño:
+
+```bash
+npm run make:icon
+```
+
+El script dibuja el carácter 学 en Noto Sans JP sobre un cuadrado redondeado
+y captura la página a 1024×1024. La fuente se incrusta en base64 porque un
+`@font-face` con `file://` no llega a cargar en el renderer, y hace falta
+una espera antes de capturar: sin ella el glifo sale en la tipografía de
+reserva. El arte ocupa el 80 % centrado sobre lienzo transparente, que es la
+proporción que espera macOS.
+
+electron-builder deriva de ahí el `.icns` y el `.ico`.
+
 ### Pendiente
 
-- **Icono propio.** Ahora usa el de Electron por defecto: basta con poner un
-  PNG de 512×512 en `build/icon.png`.
 - **Firma de código.** Los paquetes salen sin firmar (`identity: null`). En
   macOS eso obliga a abrir la app con clic derecho → Abrir la primera vez, y
   en Windows aparece el aviso de SmartScreen. Distribuirla de verdad exige

@@ -15,7 +15,8 @@
     "check": "vite build --config vite.check.config.mts && node dist-check/check-db.cjs",
     "data:kanji": "node --experimental-strip-types scripts/build-kanji.ts",
     "data:words": "node --max-old-space-size=4096 --experimental-strip-types scripts/build-kanji-words.ts",
-    "data:strokes": "node --max-old-space-size=4096 --experimental-strip-types scripts/build-kanjivg.ts"
+    "data:strokes": "node --max-old-space-size=4096 --experimental-strip-types scripts/build-kanjivg.ts",
+    "make:icon": "electron scripts/make-icon.mjs && sips -Z 1024 build/icon.png --out build/icon.png"
   },
   "dependencies": {
     "@fontsource/noto-sans-jp": "^5.3.0",

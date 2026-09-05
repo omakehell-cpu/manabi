@@ -163,6 +163,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
   const [phase, setPhase] = useState<Phase>('asking')
   const [tally, setTally] = useState({ right: 0, wrong: 0 })
   const [done, setDone] = useState(0)
+  const [justSuspended, setJustSuspended] = useState(false)
   const [exhausted, setExhausted] = useState<Exhausted | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const shownAt = useRef(Date.now())
@@ -224,6 +225,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
   const advance = useCallback(() => {
     setPhase('asking')
     setValue('')
+    setJustSuspended(false)
     setDone((d) => d + 1)
     if (queue && index + 1 >= queue.length) {
       void refill()
@@ -246,7 +248,10 @@ export default function Study({ deck, deckName, onExit }: Props) {
     } else {
       setPhase('wrong')
       setTally((t) => ({ ...t, wrong: t.wrong + 1 }))
-      await window.manabi.grade(card.cardId, 1, elapsed)
+      const outcome = await window.manabi.grade(card.cardId, 1, elapsed)
+      // Apartarla en silencio dejaba al usuario sin saber que había dejado
+      // de ver algo; se avisa aquí y queda listada en Progreso.
+      setJustSuspended(outcome.suspended)
     }
   }, [card, prompt, phase, value])
 
@@ -449,6 +454,13 @@ export default function Study({ deck, deckName, onExit }: Props) {
               </div>
               <p className="mt-2 text-lg text-muted">{prompt.word.meaning}</p>
             </div>
+          )}
+
+          {justSuspended && (
+            <p className="mt-4 rounded-xl border border-warn/40 px-5 py-3 text-center text-sm leading-relaxed text-warn">
+              Esta carta se aparta: llevas ocho fallos con ella. Sigue en Progreso →
+              Cartas apartadas, por si quieres devolverla.
+            </p>
           )}
 
           <div className="mt-6 flex h-12 items-center justify-center gap-3">

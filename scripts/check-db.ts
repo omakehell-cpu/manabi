@@ -16,6 +16,9 @@ import {
   newIntroducedToday,
   browseKanji,
   kanjiDetail,
+  listLeeches,
+  reviveCard,
+  getForecast,
 } from '../electron/db'
 
 const DB = process.env.CHECK_DB ?? '/tmp/manabi-check.db'
@@ -232,6 +235,46 @@ const mature = browsedN5.filter((k) => k.progress === 'mature').length
 expect('refleja el progreso real', mature, (v) => v > 0, 'se asentó N5 más arriba')
 expect('ningún N5 sigue bloqueado', browsedN5.filter((k) => k.progress === 'locked').length, (v) => v === 0, '')
 expect('los de N1 sí', browseKanji({ level: 1 }).every((k) => k.progress === 'locked'), (v) => v === true, '')
+
+// ---------------------------------------------- apartadas y previsión
+
+console.log('\nCartas apartadas')
+expect('de entrada no hay ninguna', listLeeches().length, (v) => v === 0, '')
+
+// Fallar la misma carta hasta pasar el umbral de ocho lapsus.
+const victim = getQueue('hiragana', 1, 999)[0]
+let suspendedAt = 0
+for (let i = 1; i <= 12 && !suspendedAt; i++) {
+  if (gradeCard(victim.cardId, 1, 800).suspended) suspendedAt = i
+}
+expect('se aparta al octavo fallo', suspendedAt, (v) => v === 8, 'el umbral es 8')
+
+const leeches = listLeeches()
+expect('aparece en la lista', leeches.length, (v) => v === 1, '')
+expect('se identifica bien', leeches[0]?.glyph, (v) => v === victim.glyph, '')
+expect('registra los fallos', leeches[0]?.failures, (v) => v >= 8, '')
+expect('ya no se sirve', getQueue('hiragana', 999, 999).some((c) => c.cardId === victim.cardId), (v) => v === false, 'una carta apartada no debe salir')
+
+reviveCard(victim.cardId)
+expect('al devolverla desaparece de la lista', listLeeches().length, (v) => v === 0, '')
+expect('y vuelve a la circulación', getQueue('hiragana', 999, 999).some((c) => c.cardId === victim.cardId), (v) => v === true, '')
+
+// Lo importante: el umbral sube, así que un solo fallo no la aparta otra vez.
+const again = gradeCard(victim.cardId, 1, 800)
+expect('no se aparta al primer tropiezo', again.suspended, (v) => v === false, 'el margen no se amplió')
+
+console.log('\nPrevisión de carga')
+const fc = getForecast(14)
+expect('devuelve 14 días', fc.days.length, (v) => v === 14, '')
+expect('hay repasos programados', fc.days.reduce((n, d) => n + d.count, 0), (v) => v > 0, 'se ha estudiado bastante arriba')
+expect('las fechas están ordenadas', fc.days.map((d) => d.day), (v) => v.join() === [...v].sort().join(), '')
+const withLoad = fc.days.filter((d) => d.count > 0).length
+console.log(`  ${fc.overdue} atrasados · ${fc.days.reduce((n, d) => n + d.count, 0)} repasos repartidos en ${withLoad} días`)
+
+// Las cartas nuevas no deben contarse: su fecha aún no está decidida.
+const untouched = getForecast(14).days.reduce((n, d) => n + d.count, 0)
+const newCards = browseKanji({ level: 1 }).length
+expect('no cuenta las cartas sin estrenar', untouched < newCards * 2, (v) => v === true, 'estaría inflando la previsión')
 
 console.log(failures === 0 ? '\nTodo correcto\n' : `\n${failures} comprobación(es) fallida(s)\n`)
 process.exit(failures === 0 ? 0 : 1)

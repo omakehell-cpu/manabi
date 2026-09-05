@@ -9,6 +9,8 @@ import {
   setSpeechRate,
 } from '../lib/speech'
 import { useVoicesReady } from './Speaker'
+import Forecast from './Forecast'
+import Leeches from './Leeches'
 
 interface Props {
   overview: Overview
@@ -83,6 +85,10 @@ export default function Stats({ overview, onExport, onReset }: Props) {
           </div>
         </>
       )}
+
+      <Forecast />
+
+      <Leeches />
 
       <StudySettings />
 

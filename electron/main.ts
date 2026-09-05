@@ -16,6 +16,11 @@ import {
   browseKanji,
   kanjiDetail,
   kanjiProgressCounts,
+  listLeeches,
+  reviveCard,
+  reviveAllLeeches,
+  suspendCard,
+  getForecast,
   type BrowseFilters,
 } from './db'
 
@@ -59,6 +64,11 @@ app.whenReady().then(() => {
   ipcMain.handle('kanji:browse', (_e, filters: BrowseFilters) => browseKanji(filters))
   ipcMain.handle('kanji:detail', (_e, glyph: string) => kanjiDetail(glyph))
   ipcMain.handle('kanji:counts', (_e, level: number) => kanjiProgressCounts(level))
+  ipcMain.handle('leeches:list', () => listLeeches())
+  ipcMain.handle('leeches:revive', (_e, cardId: number) => reviveCard(cardId))
+  ipcMain.handle('leeches:reviveAll', () => reviveAllLeeches())
+  ipcMain.handle('card:suspend', (_e, cardId: number) => suspendCard(cardId))
+  ipcMain.handle('stats:forecast', (_e, days?: number) => getForecast(days))
   ipcMain.handle('settings:newPerDay', () => newPerDay())
   ipcMain.handle('settings:setNewPerDay', (_e, value: number) => {
     setNewPerDay(value)

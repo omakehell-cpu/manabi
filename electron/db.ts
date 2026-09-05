@@ -39,8 +39,8 @@ interface KanjiWordJson {
 const MATURE = State.Review
 /** Proporción del bloque previo que hay que asentar para abrir el siguiente. */
 const BLOCK_THRESHOLD = 0.8
-/** Fallos consecutivos tras los que una carta se aparta como leech. */
-const LEECH_LAPSES = 8
+/** Fallos acumulados tras los que una carta se aparta como leech. */
+const LEECH_FAILURES = 8
 
 /**
  * Cuánto se pueden adelantar las cartas que están en aprendizaje.
@@ -64,9 +64,24 @@ let db: Database.Database
 export function openDatabase(file: string): Database.Database {
   db = new Database(file)
   db.exec(schemaSql)
+  migrate()
   seed()
   refreshLocks()
   return db
+}
+
+/**
+ * El esquema se crea con CREATE TABLE IF NOT EXISTS, que no toca las tablas
+ * ya existentes. Las columnas añadidas después necesitan un ALTER explícito
+ * para que las instalaciones en marcha no pierdan el progreso.
+ */
+function migrate(): void {
+  const columns = (db.prepare('PRAGMA table_info(card)').all() as { name: string }[]).map(
+    (c) => c.name,
+  )
+  if (!columns.includes('leech_at')) {
+    db.exec(`ALTER TABLE card ADD COLUMN leech_at INTEGER NOT NULL DEFAULT ${LEECH_FAILURES}`)
+  }
 }
 
 // ---------------------------------------------------------------- seed
@@ -534,6 +549,15 @@ export interface GradeResult {
   intervalDays: number
 }
 
+/** Fallos («Otra vez») acumulados por una carta a lo largo de su historia. */
+function countFailures(cardId: number): number {
+  return (
+    db.prepare('SELECT COUNT(*) AS n FROM review WHERE card_id = ? AND rating = 1').get(cardId) as {
+      n: number
+    }
+  ).n
+}
+
 export function gradeCard(cardId: number, rating: Grade, durationMs: number): GradeResult {
   const row = db.prepare('SELECT * FROM card WHERE id = ?').get(cardId) as
     | Record<string, unknown>
@@ -543,14 +567,13 @@ export function gradeCard(cardId: number, rating: Grade, durationMs: number): Gr
   const now = new Date()
   const stateBefore = row.state as number
   const next = scheduler.next(rowToFsrs(row), now, rating).card
-  const suspended = next.lapses >= LEECH_LAPSES
 
   db.transaction(() => {
     db.prepare(
       `UPDATE card SET due = @due, stability = @stability, difficulty = @difficulty,
          elapsed_days = @elapsed_days, scheduled_days = @scheduled_days,
          learning_steps = @learning_steps, reps = @reps, lapses = @lapses,
-         state = @state, last_review = @last_review, suspended = @suspended
+         state = @state, last_review = @last_review
        WHERE id = @id`,
     ).run({
       id: cardId,
@@ -564,13 +587,21 @@ export function gradeCard(cardId: number, rating: Grade, durationMs: number): Gr
       lapses: next.lapses,
       state: next.state,
       last_review: next.last_review ? next.last_review.toISOString() : now.toISOString(),
-      suspended: suspended ? 1 : 0,
     })
     db.prepare(
       `INSERT INTO review (card_id, reviewed_at, rating, duration_ms, state_before)
        VALUES (?, ?, ?, ?, ?)`,
     ).run(cardId, now.toISOString(), rating, Math.round(durationMs), stateBefore)
   })()
+
+  // El criterio son los fallos realmente registrados, no el contador de
+  // lapsus de FSRS: ese solo sube al fallar una carta que ya estaba en
+  // repaso, así que una carta que nunca llegas a aprender se queda en
+  // aprendizaje acumulando cero lapsus por muchas veces que la falles
+  // — justo el caso que esto tiene que detectar.
+  const suspended =
+    countFailures(cardId) >= Number(row.leech_at ?? LEECH_FAILURES)
+  if (suspended) db.prepare('UPDATE card SET suspended = 1 WHERE id = ?').run(cardId)
 
   refreshLocks()
 
@@ -939,4 +970,133 @@ export function kanjiProgressCounts(level = 0): Record<KanjiProgress, number> {
   const out: Record<KanjiProgress, number> = { locked: 0, new: 0, learning: 0, mature: 0 }
   for (const k of browseKanji({ level })) out[k.progress]++
   return out
+}
+
+// ----------------------------------------------- cartas apartadas
+
+export interface LeechCard {
+  cardId: number
+  deck: string
+  deckName: string
+  glyph: string
+  reading: string
+  meaning: string | null
+  cardType: CardType
+  lapses: number
+  reps: number
+  /** Fallos acumulados; es el criterio por el que se aparta. */
+  failures: number
+  /** Proporción de fallos sobre el total de repasos, en tanto por ciento. */
+  failureRate: number
+}
+
+/**
+ * Cartas que se han apartado por acumular fallos. Sin esta lista se
+ * esfumaban de la circulación sin que el usuario llegara a enterarse.
+ */
+export function listLeeches(): LeechCard[] {
+  return (
+    db
+      .prepare(
+        `SELECT c.id AS cardId, d.slug AS deck, d.name AS deckName,
+                i.glyph, i.reading, i.meaning, c.card_type AS cardType,
+                c.lapses, c.reps,
+                (SELECT COUNT(*) FROM review r WHERE r.card_id = c.id AND r.rating = 1)
+                  AS failures
+         FROM card c
+         JOIN item i ON i.id = c.item_id
+         JOIN deck d ON d.id = i.deck_id
+         WHERE c.suspended = 1
+         ORDER BY failures DESC, d.position, i.position`,
+      )
+      .all() as Omit<LeechCard, 'failureRate'>[]
+  ).map((c) => ({
+    ...c,
+    failureRate: c.reps ? Math.round((c.failures / c.reps) * 100) : 0,
+  }))
+}
+
+/**
+ * Devuelve una carta a la circulación. El umbral sube para que no vuelva a
+ * apartarse al primer tropiezo: arrastra los lapsus de antes, y esos no se
+ * borran porque FSRS los usa para calcular la dificultad.
+ */
+export function reviveCard(cardId: number): void {
+  db.prepare(
+    `UPDATE card SET suspended = 0, leech_at = ?, due = ? WHERE id = ?`,
+  ).run(countFailures(cardId) + LEECH_FAILURES, new Date().toISOString(), cardId)
+}
+
+export function suspendCard(cardId: number): void {
+  db.prepare('UPDATE card SET suspended = 1 WHERE id = ?').run(cardId)
+}
+
+export function reviveAllLeeches(): number {
+  const ids = (db.prepare('SELECT id FROM card WHERE suspended = 1').all() as { id: number }[]).map(
+    (r) => r.id,
+  )
+  db.transaction(() => {
+    for (const id of ids) reviveCard(id)
+  })()
+  return ids.length
+}
+
+// ------------------------------------------------- previsión de carga
+
+export interface ForecastDay {
+  /** Fecha en formato YYYY-MM-DD. */
+  day: string
+  count: number
+}
+
+export interface Forecast {
+  /** Repasos ya vencidos que siguen sin hacerse. */
+  overdue: number
+  days: ForecastDay[]
+}
+
+/**
+ * Repasos ya programados para los próximos días.
+ *
+ * Solo cuenta lo que FSRS tiene agendado: las cartas nuevas que aún no se
+ * han estudiado no aparecen, porque su fecha depende de cuándo se estudien
+ * y con qué nota. Es una previsión de lo comprometido, no una estimación.
+ */
+export function getForecast(days = 14): Forecast {
+  const now = new Date()
+  const nowIso = now.toISOString()
+  const end = new Date(now)
+  end.setDate(end.getDate() + days)
+  end.setHours(23, 59, 59, 999)
+
+  const overdue = (
+    db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM card
+         WHERE locked = 0 AND suspended = 0 AND state != 0 AND due <= ?`,
+      )
+      .get(nowIso) as { n: number }
+  ).n
+
+  // date() interpreta el ISO como UTC; el localtime lo lleva al día del
+  // usuario, que es el que ve en pantalla.
+  const rows = db
+    .prepare(
+      `SELECT date(due, 'localtime') AS day, COUNT(*) AS count
+       FROM card
+       WHERE locked = 0 AND suspended = 0 AND state != 0
+         AND due > ? AND due <= ?
+       GROUP BY day ORDER BY day`,
+    )
+    .all(nowIso, end.toISOString()) as ForecastDay[]
+
+  const counts = new Map(rows.map((r) => [r.day, r.count]))
+  const out: ForecastDay[] = []
+  const cursor = new Date(now)
+  for (let i = 0; i < days; i++) {
+    cursor.setDate(i === 0 ? cursor.getDate() : cursor.getDate() + 1)
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`
+    out.push({ day: key, count: counts.get(key) ?? 0 })
+  }
+  return { overdue, days: out }
 }

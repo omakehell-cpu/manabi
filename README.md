@@ -99,6 +99,32 @@ se mira el futuro cercano (20 minutos), y entonces la aplicación ofrece
 terminar en lugar de repetir en bucle la única carta pendiente — el respiro
 entre repeticiones es parte del método, no un hueco que rellenar.
 
+## Cartas apartadas
+
+Una carta que se falla ocho veces se aparta sola: si no, envenena todas las
+sesiones. Quedan listadas en Progreso, con su recuento de fallos, y se pueden
+devolver a la circulación.
+
+El criterio son los **fallos realmente registrados**, no el contador de
+lapsus de FSRS. Ese solo sube al fallar una carta que ya estaba en repaso,
+así que una carta que nunca llegas a aprender se queda en aprendizaje
+acumulando cero lapsus por muchas veces que la falles — justo el caso que
+esto tiene que detectar.
+
+Al devolver una carta, su umbral sube en lugar de borrarle los fallos: así
+no se vuelve a apartar al primer tropiezo, y FSRS conserva el historial con
+el que calcula la dificultad.
+
+## Previsión de carga
+
+Progreso muestra los repasos ya comprometidos para los próximos catorce
+días, con el total, la media diaria y el día más cargado. Es la cifra que
+permite decidir si hoy conviene meter más material nuevo.
+
+Solo cuenta lo ya programado. Las cartas nuevas sin estudiar no aparecen,
+porque su fecha depende de cuándo las veas y con qué nota: es una previsión
+de lo comprometido, no una estimación.
+
 ## Pronunciación
 
 Los botones de audio usan las voces japonesas instaladas en el sistema

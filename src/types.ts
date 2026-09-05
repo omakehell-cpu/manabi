@@ -74,6 +74,30 @@ export interface BrowseFilters {
   limit?: number
 }
 
+export interface LeechCard {
+  cardId: number
+  deck: string
+  deckName: string
+  glyph: string
+  reading: string
+  meaning: string | null
+  cardType: CardType
+  lapses: number
+  reps: number
+  failures: number
+  failureRate: number
+}
+
+export interface ForecastDay {
+  day: string
+  count: number
+}
+
+export interface Forecast {
+  overdue: number
+  days: ForecastDay[]
+}
+
 export interface ManabiApi {
   getQueue(slug: string, limit?: number, aheadMinutes?: number): Promise<StudyCard[]>
   grade(cardId: number, rating: 1 | 2 | 3 | 4, durationMs: number): Promise<GradeResult>
@@ -82,6 +106,11 @@ export interface ManabiApi {
   browseKanji(filters: BrowseFilters): Promise<KanjiBrowseItem[]>
   kanjiDetail(glyph: string): Promise<KanjiDetail | null>
   kanjiCounts(level: number): Promise<Record<KanjiProgress, number>>
+  leeches(): Promise<LeechCard[]>
+  reviveLeech(cardId: number): Promise<void>
+  reviveAllLeeches(): Promise<number>
+  suspendCard(cardId: number): Promise<void>
+  forecast(days?: number): Promise<Forecast>
   newPerDay(): Promise<number>
   setNewPerDay(value: number): Promise<number>
   overview(): Promise<Overview>

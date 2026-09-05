@@ -44,6 +44,9 @@ CREATE TABLE IF NOT EXISTS card (
   -- Gestión propia
   locked         INTEGER NOT NULL DEFAULT 0,  -- aún no desbloqueada por progresión
   suspended      INTEGER NOT NULL DEFAULT 0,  -- leech: apartada manual o automáticamente
+  -- Lapsus a partir de los cuales se aparta. Sube al reactivarla, para dar
+  -- un ciclo limpio sin falsear el historial que FSRS usa para calcular.
+  leech_at       INTEGER NOT NULL DEFAULT 8,
   UNIQUE (item_id, card_type)
 );
 

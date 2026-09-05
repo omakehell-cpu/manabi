@@ -81,3 +81,14 @@ input {
 .shake {
   animation: shake 180ms ease-in-out;
 }
+
+/* El trazo activo se dibuja de principio a fin; pathLength="1" hace que la
+   longitud real de cada curva no afecte a la duración. */
+@keyframes draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}

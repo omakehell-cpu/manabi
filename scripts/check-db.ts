@@ -19,6 +19,7 @@ import {
   listLeeches,
   reviveCard,
   getForecast,
+  kanjiStrokes,
 } from '../electron/db'
 
 const DB = process.env.CHECK_DB ?? '/tmp/manabi-check.db'
@@ -275,6 +276,24 @@ console.log(`  ${fc.overdue} atrasados · ${fc.days.reduce((n, d) => n + d.count
 const untouched = getForecast(14).days.reduce((n, d) => n + d.count, 0)
 const newCards = browseKanji({ level: 1 }).length
 expect('no cuenta las cartas sin estrenar', untouched < newCards * 2, (v) => v === true, 'estaría inflando la previsión')
+
+console.log('\nOrden de trazos')
+const water = kanjiStrokes('水')
+expect('水 tiene trazado', water.length, (v) => v === 4, '水 son 4 trazos')
+expect('son comandos SVG', water.every((d) => /^M[\d.]/.test(d)), (v) => v === true, 'cada trazo empieza con un moveto')
+
+// La cobertura importa: un hueco deja la ficha coja justo en el kanji raro,
+// que es donde más falta hace ver cómo se escribe.
+const allKanji = JSON.parse(readFileSync('src/data/kanji.json', 'utf8')) as { k: string; s: number }[]
+const sinTrazado = allKanji.filter((r) => kanjiStrokes(r.k).length === 0)
+expect('ninguno se queda sin trazado', sinTrazado.length, (v) => v === 0,
+  sinTrazado.length ? sinTrazado.slice(0, 10).map((r) => r.k).join('') : '')
+
+// El número de trazos de KanjiVG debe cuadrar con el que dice KANJIDIC2.
+const desajuste = allKanji.filter((r) => r.s > 0 && kanjiStrokes(r.k).length !== r.s)
+console.log(`  ${allKanji.length} kanji · ${desajuste.length} con recuento distinto al de KANJIDIC2`)
+expect('los recuentos concuerdan', desajuste.length / allKanji.length, (v) => v < 0.05,
+  desajuste.length ? `p. ej. ${desajuste[0].k}: ${kanjiStrokes(desajuste[0].k).length} vs ${desajuste[0].s}` : '')
 
 console.log(failures === 0 ? '\nTodo correcto\n' : `\n${failures} comprobación(es) fallida(s)\n`)
 process.exit(failures === 0 ? 0 : 1)

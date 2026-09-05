@@ -19,6 +19,7 @@ const api = {
   reviveAllLeeches: () => ipcRenderer.invoke('leeches:reviveAll'),
   suspendCard: (cardId: number) => ipcRenderer.invoke('card:suspend', cardId),
   forecast: (days?: number) => ipcRenderer.invoke('stats:forecast', days),
+  kanjiStrokes: (glyph: string) => ipcRenderer.invoke('kanji:strokes', glyph),
   newPerDay: () => ipcRenderer.invoke('settings:newPerDay'),
   setNewPerDay: (value: number) => ipcRenderer.invoke('settings:setNewPerDay', value),
   overview: () => ipcRenderer.invoke('stats:overview'),

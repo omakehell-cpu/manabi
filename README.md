@@ -99,6 +99,20 @@ se mira el futuro cercano (20 minutos), y entonces la aplicación ofrece
 terminar en lugar de repetir en bucle la única carta pendiente — el respiro
 entre repeticiones es parte del método, no un hueco que rellenar.
 
+## Orden de trazos
+
+La ficha de cada kanji anima cómo se escribe, trazo a trazo, con datos de
+KanjiVG: los 2383 caracteres del temario, 25 154 trazos. Se puede reproducir
+entero o avanzar trazo a trazo. Durante el estudio se anima solo al fallar un
+kanji, que es cuando conviene fijarse.
+
+Cada trazo lleva `pathLength="1"`, que normaliza su longitud real a la
+unidad: así se anima con un dash-offset sin medir cada curva en el DOM, y
+todos los trazos tardan lo mismo independientemente de su tamaño.
+
+Los 2 MB de trazados viven en el proceso principal y se sirven por petición,
+para no cargarlos enteros en el renderer solo por mostrar un kanji.
+
 ## Cartas apartadas
 
 Una carta que se falla ocho veces se aparta sola: si no, envenena todas las
@@ -166,7 +180,8 @@ actualizarlos. Las fuentes pesan más de 100 MB y no se versionan:
 ```bash
 curl -o kanjidic2.xml.gz https://www.edrdg.org/kanjidic/kanjidic2.xml.gz
 curl -o JMdict.gz https://www.edrdg.org/pub/Nihongo/JMdict.gz
-gunzip kanjidic2.xml.gz JMdict.gz
+curl -Lo kanjivg.xml.gz https://github.com/KanjiVG/kanjivg/releases/download/r20250816/kanjivg-20250816.xml.gz
+gunzip kanjidic2.xml.gz JMdict.gz kanjivg.xml.gz
 npm pack kanji-data && tar xzf kanji-data-*.tgz   # listas JLPT
 ```
 
@@ -175,6 +190,7 @@ Con todo en un directorio `<fuentes>`:
 ```bash
 node --experimental-strip-types scripts/build-kanji.ts <fuentes>
 node --max-old-space-size=4096 --experimental-strip-types scripts/build-kanji-words.ts <fuentes>
+node --max-old-space-size=4096 --experimental-strip-types scripts/build-kanjivg.ts <fuentes>
 ```
 
 `npm run check` es la red de seguridad: comprueba la siembra, la
@@ -217,6 +233,8 @@ recogida en la pantalla **Créditos**.
   usados conforme a su [licencia](https://www.edrdg.org/edrdg/licence.html).
 - **Listas JLPT** de Jonathan Waller, vía el paquete `kanji-data` y
   kanjiapi.dev.
+- [KanjiVG](https://kanjivg.tagaini.net/) de Ulrich Apel — orden de trazos,
+  CC BY-SA 3.0.
 
 Los 75 kanji que KANJIDIC2 no traduce al español —casi todos jōyō
 incorporados en la revisión de 2010— se tradujeron para esta aplicación

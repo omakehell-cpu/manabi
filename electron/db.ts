@@ -7,6 +7,9 @@ import { VOCAB } from '../src/data/vocab'
 import { tokenizeKana } from '../src/lib/tokenize'
 import KANJI from '../src/data/kanji.json'
 import KANJI_WORDS from '../src/data/kanji-words.json'
+// El trazado vive en el proceso principal y se sirve por petición: son
+// 2 MB que no tiene sentido cargar en el renderer para ver un kanji.
+import KANJI_STROKES from '../src/data/kanji-strokes.json'
 
 export type CardType = 'recognition' | 'recall' | 'reading' | 'meaning' | 'word'
 
@@ -1099,4 +1102,9 @@ export function getForecast(days = 14): Forecast {
     out.push({ day: key, count: counts.get(key) ?? 0 })
   }
   return { overdue, days: out }
+}
+
+/** Trazos de un kanji, en el orden en que se escriben. */
+export function kanjiStrokes(glyph: string): string[] {
+  return (KANJI_STROKES as Record<string, string[]>)[glyph] ?? []
 }

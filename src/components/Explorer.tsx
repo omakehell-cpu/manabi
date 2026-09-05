@@ -3,6 +3,7 @@ import { toHiragana, toKatakana } from 'wanakana'
 import type { KanjiBrowseItem, KanjiDetail, KanjiProgress } from '../types'
 import { cleanReading } from '../lib/speech'
 import Speaker from './Speaker'
+import StrokeOrder from './StrokeOrder'
 
 const LEVELS = [0, 5, 4, 3, 2, 1] as const
 
@@ -186,7 +187,7 @@ function DetailPanel({ detail, onClose }: { detail: KanjiDetail; onClose: () => 
         className="max-h-full w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-7"
       >
         <div className="flex items-start gap-6">
-          <span className="jp text-8xl leading-none">{detail.glyph}</span>
+          <StrokeOrder glyph={detail.glyph} size={150} />
           <div className="min-w-0 flex-1">
             <p className="text-lg">{detail.meanings.join(', ')}</p>
             <p className="mt-2 text-sm text-muted">

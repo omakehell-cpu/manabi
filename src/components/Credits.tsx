@@ -35,6 +35,11 @@ export default function Credits() {
             text="Reparto de los kanji entre los niveles N5 a N1, distribuidas a través del paquete kanji-data y kanjiapi.dev."
           />
           <Entry
+            title="KanjiVG"
+            license="Ulrich Apel · CC BY-SA 3.0"
+            text="Orden de trazos de los 2383 kanji, 25 154 trazos en total, que se animan en la ficha de cada carácter y al fallarlo durante el estudio."
+          />
+          <Entry
             title="Voces del sistema"
             license="Web Speech API"
             text="La pronunciación usa las voces japonesas instaladas en tu equipo (Kyoko en macOS; Haruka, Nanami o Ayumi en Windows). No se empaqueta audio."
@@ -48,17 +53,12 @@ export default function Credits() {
       </section>
 
       <section className="mt-10">
-        <h2 className="text-sm tracking-wide text-muted uppercase">Previsto</h2>
+        <h2 className="text-sm tracking-wide text-muted uppercase">También en uso</h2>
         <div className="mt-4 space-y-5 text-sm leading-relaxed">
           <Entry
             title="JMdict"
             license="Electronic Dictionary Research and Development Group"
-            text="Vocabulario para fijar cada kanji dentro de palabras reales."
-          />
-          <Entry
-            title="KanjiVG"
-            license="CC BY-SA 3.0"
-            text="Orden de trazos en SVG, para animar cómo se escribe cada kanji."
+            text="Vocabulario para fijar cada kanji dentro de palabras reales. Sus ficheros son propiedad del EDRDG y se usan conforme a su licencia."
           />
         </div>
       </section>

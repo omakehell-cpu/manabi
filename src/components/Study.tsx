@@ -3,6 +3,7 @@ import type { StudyCard } from '../types'
 import { checkAnswer, toTargetKana, type CheckMode } from '../lib/answer'
 import { cleanReading } from '../lib/speech'
 import Speaker from './Speaker'
+import StrokeOrder from './StrokeOrder'
 
 /** Detalle que se despliega al responder una carta de kanji. */
 interface KanjiDetail {
@@ -439,7 +440,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
           )}
 
           {answered && prompt.kanji && (
-            <KanjiPanel detail={prompt.kanji} failed={phase === 'wrong'} />
+            <KanjiPanel detail={prompt.kanji} failed={phase === 'wrong'} glyph={card.glyph} />
           )}
 
           {answered && prompt.word && (
@@ -485,11 +486,25 @@ export default function Study({ deck, deckName, onExit }: Props) {
  * fallar: es el momento en que de verdad se aprende, y un kanji tiene más
  * de lo que cabe en una respuesta.
  */
-function KanjiPanel({ detail, failed }: { detail: KanjiDetail; failed: boolean }) {
+function KanjiPanel({
+  detail,
+  failed,
+  glyph,
+}: {
+  detail: KanjiDetail
+  failed: boolean
+  glyph: string
+}) {
   return (
     <div
       className={`mt-5 rounded-xl px-5 py-4 ${failed ? 'bg-accent-soft' : 'bg-surface border border-line'}`}
     >
+      {/* Se anima al fallar: es cuando conviene fijarse en cómo se escribe. */}
+      {failed && (
+        <div className="mb-4 flex justify-center">
+          <StrokeOrder glyph={glyph} size={140} autoPlay />
+        </div>
+      )}
       <p className="text-center text-lg">{detail.meanings.join(', ')}</p>
       <div className="mt-4 space-y-2">
         {detail.on.length > 0 && <ReadingRow label="ON" readings={detail.on} />}

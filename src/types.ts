@@ -111,6 +111,7 @@ export interface ManabiApi {
   reviveAllLeeches(): Promise<number>
   suspendCard(cardId: number): Promise<void>
   forecast(days?: number): Promise<Forecast>
+  kanjiStrokes(glyph: string): Promise<string[]>
   newPerDay(): Promise<number>
   setNewPerDay(value: number): Promise<number>
   overview(): Promise<Overview>

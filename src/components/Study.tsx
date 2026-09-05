@@ -165,6 +165,8 @@ export default function Study({ deck, deckName, onExit }: Props) {
   const [tally, setTally] = useState({ right: 0, wrong: 0 })
   const [done, setDone] = useState(0)
   const [justSuspended, setJustSuspended] = useState(false)
+  /** Notas dadas en esta sesión, para revertir el recuento al deshacer. */
+  const history = useRef<(1 | 2 | 3 | 4)[]>([])
   const [exhausted, setExhausted] = useState<Exhausted | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const shownAt = useRef(Date.now())
@@ -245,10 +247,12 @@ export default function Study({ deck, deckName, onExit }: Props) {
     if (result.correct) {
       setPhase('right')
       setTally((t) => ({ ...t, right: t.right + 1 }))
+      history.current.push(3)
       await window.manabi.grade(card.cardId, 3, elapsed)
     } else {
       setPhase('wrong')
       setTally((t) => ({ ...t, wrong: t.wrong + 1 }))
+      history.current.push(1)
       const outcome = await window.manabi.grade(card.cardId, 1, elapsed)
       // Apartarla en silencio dejaba al usuario sin saber que había dejado
       // de ver algo; se avisa aquí y queda listada en Progreso.
@@ -260,14 +264,57 @@ export default function Study({ deck, deckName, onExit }: Props) {
   const regrade = useCallback(
     async (rating: 2 | 4) => {
       if (!card || phase !== 'right') return
+      // Recalificar sustituye la nota anterior, así que se registran las dos:
+      // deshacer tendrá que retirarlas una a una, igual que se dieron.
+      history.current.push(rating)
       await window.manabi.grade(card.cardId, rating, Date.now() - shownAt.current)
       advance()
     },
     [card, phase, advance],
   )
 
+  /**
+   * Deshace el último repaso y devuelve esa carta al principio de la cola.
+   *
+   * Se reinserta en lugar de retroceder el índice porque la cola se repone
+   * a mitad de sesión: el índice anterior puede apuntar ya a otra tanda.
+   */
+  const undo = useCallback(async () => {
+    const undone = await window.manabi.undo()
+    if (!undone) return
+
+    const rating = history.current.pop()
+    if (rating !== undefined) {
+      setTally((t) =>
+        rating === 1 ? { ...t, wrong: Math.max(0, t.wrong - 1) } : { ...t, right: Math.max(0, t.right - 1) },
+      )
+    }
+    setDone((d) => Math.max(0, d - 1))
+
+    const restored = await window.manabi.getCard(undone.cardId)
+    setExhausted(null)
+    setPhase('asking')
+    setValue('')
+    setJustSuspended(false)
+    if (restored) {
+      setQueue((q) => {
+        // Primero se recorta por el índice y después se filtra. Al revés,
+        // quitar la carta restaurada desplazaba el resto y el slice se
+        // comía una carta pendiente en cada deshacer.
+        const pending = (q ?? []).slice(index).filter((c) => c.cardId !== restored.cardId)
+        return [restored, ...pending]
+      })
+      setIndex(0)
+    }
+    shownAt.current = Date.now()
+  }, [index])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        return void undo()
+      }
       if (e.key === 'Escape') return onExit()
       if (e.key === 'Enter') {
         e.preventDefault()
@@ -280,7 +327,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [phase, submit, advance, regrade, onExit])
+  }, [phase, submit, advance, regrade, onExit, undo])
 
   // `queue` va en las dependencias a propósito: en el primer render la cola
   // aún no ha llegado y no existe el input, así que sin ella el foco inicial
@@ -322,6 +369,15 @@ export default function Study({ deck, deckName, onExit }: Props) {
             label="precisión"
           />
         </div>
+
+        {done > 0 && (
+          <button
+            onClick={() => void undo()}
+            className="mt-6 text-sm text-muted underline underline-offset-4 hover:text-fg"
+          >
+            Deshacer el último repaso
+          </button>
+        )}
 
         {exhausted?.pending ? (
           <>
@@ -365,8 +421,19 @@ export default function Study({ deck, deckName, onExit }: Props) {
             ← {deckName}
           </button>
         </div>
-        <div className="text-sm tabular-nums text-muted">
-          {done} {done === 1 ? 'carta' : 'cartas'} · quedan {queue.length - index}
+        <div className="no-drag flex items-center gap-4">
+          {done > 0 && (
+            <button
+              onClick={() => void undo()}
+              title="Deshacer el último repaso (⌘Z)"
+              className="rounded-md px-2 py-1 text-sm text-muted transition-colors hover:bg-raised hover:text-fg"
+            >
+              ↺ Deshacer
+            </button>
+          )}
+          <span className="text-sm tabular-nums text-muted">
+            {done} {done === 1 ? 'carta' : 'cartas'} · quedan {queue.length - index}
+          </span>
         </div>
       </header>
 

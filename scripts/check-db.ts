@@ -20,6 +20,9 @@ import {
   reviveCard,
   getForecast,
   kanjiStrokes,
+  undoLastReview,
+  canUndo,
+  getCard,
 } from '../electron/db'
 
 const DB = process.env.CHECK_DB ?? '/tmp/manabi-check.db'
@@ -294,6 +297,36 @@ const desajuste = allKanji.filter((r) => r.s > 0 && kanjiStrokes(r.k).length !==
 console.log(`  ${allKanji.length} kanji · ${desajuste.length} con recuento distinto al de KANJIDIC2`)
 expect('los recuentos concuerdan', desajuste.length / allKanji.length, (v) => v < 0.05,
   desajuste.length ? `p. ej. ${desajuste[0].k}: ${kanjiStrokes(desajuste[0].k).length} vs ${desajuste[0].s}` : '')
+
+console.log('\nDeshacer')
+const target2 = getQueue('katakana', 1, 999)[0] ?? getQueue('hiragana', 1, 999)[0]
+const before = getCard(target2.cardId)!
+const reviewsBefore = getOverview().totalReviews
+
+const graded = gradeCard(target2.cardId, 3, 1200)
+const after = getCard(target2.cardId)!
+expect('calificar cambia el estado', after.due !== before.due || after.reps !== before.reps, (v) => v === true, '')
+expect('hay algo que deshacer', canUndo(), (v) => v === true, '')
+
+const undone = undoLastReview()
+expect('deshace la carta correcta', undone?.cardId, (v) => v === target2.cardId, '')
+expect('devuelve la nota retirada', undone?.rating, (v) => v === 3, '')
+
+const restored = getCard(target2.cardId)!
+expect('restaura el vencimiento', restored.due, (v) => v === before.due, `era ${before.due}`)
+expect('restaura los repasos', restored.reps, (v) => v === before.reps, '')
+expect('restaura el estado', restored.state, (v) => v === before.state, '')
+expect('borra el registro del repaso', getOverview().totalReviews, (v) => v === reviewsBefore, 'el repaso no debe seguir contando')
+void graded
+
+// Deshacer una suspensión: la carta tiene que volver a circular.
+const victim2 = getQueue('katakana', 1, 999)[0]
+let hitLimit = false
+for (let i = 0; i < 12 && !hitLimit; i++) hitLimit = gradeCard(victim2.cardId, 1, 700).suspended
+expect('la carta se apartó', hitLimit, (v) => v === true, '')
+expect('y figura como apartada', listLeeches().some((l) => l.cardId === victim2.cardId), (v) => v === true, '')
+undoLastReview()
+expect('deshacer retira la suspensión', listLeeches().some((l) => l.cardId === victim2.cardId), (v) => v === false, 'la carta debía volver a circular')
 
 console.log(failures === 0 ? '\nTodo correcto\n' : `\n${failures} comprobación(es) fallida(s)\n`)
 process.exit(failures === 0 ? 0 : 1)

@@ -99,6 +99,21 @@ se mira el futuro cercano (20 minutos), y entonces la aplicación ofrece
 terminar en lugar de repetir en bucle la única carta pendiente — el respiro
 entre repeticiones es parte del método, no un hueco que rellenar.
 
+## Deshacer
+
+Un Intro de más calificaba una carta sin vuelta atrás. Ahora la sesión tiene
+`⌘Z` (o el botón de la cabecera), que devuelve la carta a su estado exacto
+anterior, borra el repaso y la vuelve a poner delante.
+
+El estado previo se guarda en el propio registro de repaso, no en una pila
+en memoria: así se puede deshacer aunque se haya cerrado la aplicación entre
+medias. Se pueden encadenar varios deshacer.
+
+Lo único que no se revierte son los desbloqueos. Si ese repaso abrió un
+bloque o un nivel, esas cartas siguen abiertas: volver a cerrarlas
+escondería material que ya has visto, y la apertura solo ocurre al cumplir
+el umbral, así que dejarlas no adelanta nada indebido.
+
 ## Orden de trazos
 
 La ficha de cada kanji anima cómo se escribe, trazo a trazo, con datos de
@@ -159,6 +174,7 @@ eso el audio va en cada lectura por separado, y en las palabras completas.
 | `Intro` | responder / pasar a la siguiente |
 | `2` / `4` | tras acertar: «costó» / «fácil» |
 | `Esc` | salir de la sesión, o cerrar la ficha de un kanji |
+| `Cmd`/`Ctrl` + `Z` | deshacer el último repaso |
 | `Cmd`/`Ctrl` + `F` | buscar, en Explorar |
 
 ## Desarrollo

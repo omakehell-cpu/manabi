@@ -59,7 +59,10 @@ CREATE TABLE IF NOT EXISTS review (
   reviewed_at  TEXT    NOT NULL,
   rating       INTEGER NOT NULL,       -- 1 Again 2 Hard 3 Good 4 Easy
   duration_ms  INTEGER NOT NULL DEFAULT 0,
-  state_before INTEGER NOT NULL DEFAULT 0
+  state_before INTEGER NOT NULL DEFAULT 0,
+  -- Estado completo de la carta justo antes de este repaso, en JSON. Es lo
+  -- que permite deshacer, y sobrevive a cerrar la aplicación.
+  prev_card    TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_review_at ON review (reviewed_at);

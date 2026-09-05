@@ -22,6 +22,9 @@ import {
   suspendCard,
   getForecast,
   kanjiStrokes,
+  undoLastReview,
+  canUndo,
+  getCard,
   type BrowseFilters,
 } from './db'
 
@@ -71,6 +74,9 @@ app.whenReady().then(() => {
   ipcMain.handle('card:suspend', (_e, cardId: number) => suspendCard(cardId))
   ipcMain.handle('stats:forecast', (_e, days?: number) => getForecast(days))
   ipcMain.handle('kanji:strokes', (_e, glyph: string) => kanjiStrokes(glyph))
+  ipcMain.handle('review:undo', () => undoLastReview())
+  ipcMain.handle('review:canUndo', () => canUndo())
+  ipcMain.handle('card:get', (_e, cardId: number) => getCard(cardId))
   ipcMain.handle('settings:newPerDay', () => newPerDay())
   ipcMain.handle('settings:setNewPerDay', (_e, value: number) => {
     setNewPerDay(value)

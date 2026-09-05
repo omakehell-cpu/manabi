@@ -98,6 +98,12 @@ export interface Forecast {
   days: ForecastDay[]
 }
 
+export interface UndoResult {
+  cardId: number
+  glyph: string
+  rating: number
+}
+
 export interface ManabiApi {
   getQueue(slug: string, limit?: number, aheadMinutes?: number): Promise<StudyCard[]>
   grade(cardId: number, rating: 1 | 2 | 3 | 4, durationMs: number): Promise<GradeResult>
@@ -112,6 +118,9 @@ export interface ManabiApi {
   suspendCard(cardId: number): Promise<void>
   forecast(days?: number): Promise<Forecast>
   kanjiStrokes(glyph: string): Promise<string[]>
+  undo(): Promise<UndoResult | null>
+  canUndo(): Promise<boolean>
+  getCard(cardId: number): Promise<StudyCard | null>
   newPerDay(): Promise<number>
   setNewPerDay(value: number): Promise<number>
   overview(): Promise<Overview>

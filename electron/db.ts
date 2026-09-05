@@ -85,6 +85,13 @@ function migrate(): void {
   if (!columns.includes('leech_at')) {
     db.exec(`ALTER TABLE card ADD COLUMN leech_at INTEGER NOT NULL DEFAULT ${LEECH_FAILURES}`)
   }
+
+  const reviewColumns = (db.prepare('PRAGMA table_info(review)').all() as { name: string }[]).map(
+    (c) => c.name,
+  )
+  if (!reviewColumns.includes('prev_card')) {
+    db.exec('ALTER TABLE review ADD COLUMN prev_card TEXT')
+  }
 }
 
 // ---------------------------------------------------------------- seed
@@ -592,9 +599,16 @@ export function gradeCard(cardId: number, rating: Grade, durationMs: number): Gr
       last_review: next.last_review ? next.last_review.toISOString() : now.toISOString(),
     })
     db.prepare(
-      `INSERT INTO review (card_id, reviewed_at, rating, duration_ms, state_before)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).run(cardId, now.toISOString(), rating, Math.round(durationMs), stateBefore)
+      `INSERT INTO review (card_id, reviewed_at, rating, duration_ms, state_before, prev_card)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(
+      cardId,
+      now.toISOString(),
+      rating,
+      Math.round(durationMs),
+      stateBefore,
+      JSON.stringify(row),
+    )
   })()
 
   // El criterio son los fallos realmente registrados, no el contador de
@@ -1107,4 +1121,90 @@ export function getForecast(days = 14): Forecast {
 /** Trazos de un kanji, en el orden en que se escriben. */
 export function kanjiStrokes(glyph: string): string[] {
   return (KANJI_STROKES as Record<string, string[]>)[glyph] ?? []
+}
+
+// ------------------------------------------------------------ deshacer
+
+export interface UndoResult {
+  cardId: number
+  glyph: string
+  /** Nota que se retira, para poder decir qué se ha deshecho. */
+  rating: number
+}
+
+/** Campos de `card` que se restauran al deshacer. */
+const RESTORABLE = [
+  'due',
+  'stability',
+  'difficulty',
+  'elapsed_days',
+  'scheduled_days',
+  'learning_steps',
+  'reps',
+  'lapses',
+  'state',
+  'last_review',
+  'suspended',
+  'leech_at',
+] as const
+
+/**
+ * Deshace el último repaso: devuelve la carta al estado exacto que tenía
+ * antes y borra el registro.
+ *
+ * Lo que no se revierte son los desbloqueos: si ese repaso abrió un bloque
+ * o un nivel, esas cartas siguen abiertas. Volver a cerrarlas escondería
+ * material que el usuario ya ha visto, y refreshLocks solo abre cuando se
+ * cumple el umbral, así que dejarlas abiertas no adelanta nada indebido.
+ */
+export function undoLastReview(): UndoResult | null {
+  const last = db
+    .prepare(
+      `SELECT r.id, r.card_id AS cardId, r.rating, r.prev_card, i.glyph
+       FROM review r
+       JOIN card c ON c.id = r.card_id
+       JOIN item i ON i.id = c.item_id
+       ORDER BY r.id DESC LIMIT 1`,
+    )
+    .get() as
+    | { id: number; cardId: number; rating: number; prev_card: string | null; glyph: string }
+    | undefined
+
+  // Sin `prev_card` no hay a dónde volver: son repasos anteriores a que se
+  // empezara a guardar el estado previo.
+  if (!last?.prev_card) return null
+
+  const prev = JSON.parse(last.prev_card) as Record<string, unknown>
+  const assignments = RESTORABLE.map((f) => `${f} = @${f}`).join(', ')
+  const values = Object.fromEntries(RESTORABLE.map((f) => [f, prev[f] ?? null]))
+
+  db.transaction(() => {
+    db.prepare(`UPDATE card SET ${assignments} WHERE id = @id`).run({ ...values, id: last.cardId })
+    db.prepare('DELETE FROM review WHERE id = ?').run(last.id)
+  })()
+
+  return { cardId: last.cardId, glyph: last.glyph, rating: last.rating }
+}
+
+/** Si hay algo que deshacer, para poder habilitar el botón. */
+export function canUndo(): boolean {
+  const row = db
+    .prepare('SELECT prev_card FROM review ORDER BY id DESC LIMIT 1')
+    .get() as { prev_card: string | null } | undefined
+  return Boolean(row?.prev_card)
+}
+
+/** Una carta concreta, con la forma que espera la sesión de estudio. */
+export function getCard(cardId: number): StudyCard | null {
+  return (db
+    .prepare(
+      `SELECT c.id AS cardId, i.id AS itemId, d.slug AS deck, d.kind AS deckKind,
+              c.card_type AS cardType, i.glyph, i.reading, i.meaning, i.alt,
+              i.block, c.state, c.reps, c.due
+       FROM card c
+       JOIN item i ON i.id = c.item_id
+       JOIN deck d ON d.id = i.deck_id
+       WHERE c.id = ?`,
+    )
+    .get(cardId) ?? null) as StudyCard | null
 }

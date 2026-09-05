@@ -46,11 +46,42 @@ export interface GradeResult {
   intervalDays: number
 }
 
+export type KanjiProgress = 'locked' | 'new' | 'learning' | 'mature'
+
+export interface KanjiBrowseItem {
+  glyph: string
+  level: number
+  extra: boolean
+  meaning: string
+  progress: KanjiProgress
+  strokes: number
+}
+
+export interface KanjiDetail extends KanjiBrowseItem {
+  meanings: string[]
+  on: string[]
+  kun: string[]
+  freq: number
+  grade: number
+  nextDue: string | null
+  words: { word: string; reading: string; meaning: string; progress: KanjiProgress }[]
+}
+
+export interface BrowseFilters {
+  level?: number
+  progress?: KanjiProgress | 'all'
+  terms?: string[]
+  limit?: number
+}
+
 export interface ManabiApi {
   getQueue(slug: string, limit?: number, aheadMinutes?: number): Promise<StudyCard[]>
   grade(cardId: number, rating: 1 | 2 | 3 | 4, durationMs: number): Promise<GradeResult>
   previewIntervals(cardId: number): Promise<Record<number, number>>
   deckStats(): Promise<DeckStats[]>
+  browseKanji(filters: BrowseFilters): Promise<KanjiBrowseItem[]>
+  kanjiDetail(glyph: string): Promise<KanjiDetail | null>
+  kanjiCounts(level: number): Promise<Record<KanjiProgress, number>>
   newPerDay(): Promise<number>
   setNewPerDay(value: number): Promise<number>
   overview(): Promise<Overview>

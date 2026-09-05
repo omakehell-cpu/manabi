@@ -14,6 +14,8 @@ import {
   newPerDay,
   setNewPerDay,
   newIntroducedToday,
+  browseKanji,
+  kanjiDetail,
 } from '../electron/db'
 
 const DB = process.env.CHECK_DB ?? '/tmp/manabi-check.db'
@@ -203,6 +205,33 @@ expect(
 )
 
 setNewPerDay(20)
+
+// --------------------------------------------------------- explorador
+
+console.log('\nExplorador')
+expect('lista el temario completo', browseKanji().length, (v) => v === 2383, 'esperado 2383')
+expect('filtra por nivel', browseKanji({ level: 5 }).length, (v) => v === 79, 'N5 son 79')
+
+// Buscar por el carácter, por significado en español y por lectura. El
+// renderer convierte «sui» a すい/スイ antes de consultar; aquí se simula.
+expect('busca por carácter', browseKanji({ terms: ['水'] }).map((k) => k.glyph), (v) => v.includes('水'), 'debía encontrarse')
+const agua = browseKanji({ terms: ['agua'] })
+expect('busca por significado español', agua.map((k) => k.glyph), (v) => v.includes('水'), '«agua» debía dar 水')
+const sui = browseKanji({ terms: ['スイ'] })
+expect('busca por lectura', sui.map((k) => k.glyph), (v) => v.includes('水'), '«スイ» debía dar 水')
+
+const detail = kanjiDetail('水')
+expect('la ficha existe', detail !== null, (v) => v === true, '水 debería tener ficha')
+expect('trae significados en español', detail?.meanings ?? [], (v) => v.includes('agua'), '')
+expect('trae lecturas on', detail?.on ?? [], (v) => v.length > 0, '')
+console.log(`  水 → ${detail?.meanings.join(', ')} | ON ${detail?.on.join(' ')} | KUN ${detail?.kun.join(' ')} | ${detail?.words.length} palabras`)
+
+// El estado tiene que reflejar lo estudiado en esta misma sesión.
+const browsedN5 = browseKanji({ level: 5 })
+const mature = browsedN5.filter((k) => k.progress === 'mature').length
+expect('refleja el progreso real', mature, (v) => v > 0, 'se asentó N5 más arriba')
+expect('ningún N5 sigue bloqueado', browsedN5.filter((k) => k.progress === 'locked').length, (v) => v === 0, '')
+expect('los de N1 sí', browseKanji({ level: 1 }).every((k) => k.progress === 'locked'), (v) => v === true, '')
 
 console.log(failures === 0 ? '\nTodo correcto\n' : `\n${failures} comprobación(es) fallida(s)\n`)
 process.exit(failures === 0 ? 0 : 1)

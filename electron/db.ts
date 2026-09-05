@@ -740,3 +740,203 @@ export function exportAll(): string {
     2,
   )
 }
+
+// -------------------------------------------------------- explorador
+
+/** Cómo va un kanji, resumido a partir de sus cartas de estudio. */
+export type KanjiProgress = 'locked' | 'new' | 'learning' | 'mature'
+
+export interface KanjiBrowseItem {
+  glyph: string
+  level: number
+  /** Jōyō que ninguna lista JLPT recoge. */
+  extra: boolean
+  meaning: string
+  progress: KanjiProgress
+  strokes: number
+}
+
+export interface KanjiDetail extends KanjiBrowseItem {
+  meanings: string[]
+  on: string[]
+  kun: string[]
+  freq: number
+  grade: number
+  /** Próximo repaso, si ya está en circulación. */
+  nextDue: string | null
+  words: { word: string; reading: string; meaning: string; progress: KanjiProgress }[]
+}
+
+/**
+ * Un kanji tiene dos cartas de estudio (significado y lectura) que pueden ir
+ * a distinto ritmo. Se resume en un solo estado tomando el de la más
+ * atrasada: un kanji cuya lectura aún no se sabe no está «asentado».
+ */
+function summarize(row: { minLocked: number; minState: number }): KanjiProgress {
+  if (row.minLocked === 1) return 'locked'
+  if (row.minState === 0) return 'new'
+  if (row.minState === 2) return 'mature'
+  return 'learning'
+}
+
+const BROWSE_COLUMNS = `i.glyph, i.meaning, i.alt, i.row_key AS rowKey, i.block,
+         MIN(c.locked) AS minLocked, MIN(c.state) AS minState,
+         MIN(CASE WHEN c.locked = 0 THEN c.due END) AS nextDue`
+
+const BROWSE_FROM = `FROM item i
+       JOIN deck d ON d.id = i.deck_id AND d.kind = 'kanji'
+       JOIN card c ON c.item_id = i.id AND c.card_type IN ('meaning', 'reading')
+       WHERE i.block != 'word'`
+
+interface BrowseRow {
+  glyph: string
+  meaning: string | null
+  alt: string
+  rowKey: string
+  block: string
+  minLocked: number
+  minState: number
+  nextDue: string | null
+}
+
+export interface BrowseFilters {
+  /** Nivel JLPT, o 0 para todos. */
+  level?: number
+  progress?: KanjiProgress | 'all'
+  /**
+   * Términos a buscar. El renderer envía el texto tal cual y además sus
+   * conversiones a hiragana y katakana, porque quien busca «nichi» espera
+   * encontrar ニチ sin tener que escribir en japonés.
+   */
+  terms?: string[]
+  limit?: number
+}
+
+export function browseKanji(filters: BrowseFilters = {}): KanjiBrowseItem[] {
+  const { level = 0, progress = 'all', terms = [], limit = 3000 } = filters
+
+  const clauses: string[] = []
+  const params: unknown[] = []
+
+  if (level) {
+    clauses.push('i.row_key = ?')
+    params.push(`n${level}`)
+  }
+
+  const clean = terms.map((t) => t.trim()).filter(Boolean)
+  if (clean.length) {
+    // Se busca en el carácter, en los significados y en las lecturas. Los
+    // significados viven dentro del JSON de `alt`, de ahí el LIKE sobre él.
+    const per = clean.map(() => '(i.glyph = ? OR i.alt LIKE ? OR i.reading LIKE ?)')
+    clauses.push(`(${per.join(' OR ')})`)
+    for (const t of clean) params.push(t, `%${t}%`, `%${t}%`)
+  }
+
+  const where = clauses.length ? ` AND ${clauses.join(' AND ')}` : ''
+  const rows = db
+    .prepare(
+      `SELECT ${BROWSE_COLUMNS} ${BROWSE_FROM}${where}
+       GROUP BY i.id ORDER BY i.deck_id, i.position LIMIT ?`,
+    )
+    .all(...params, limit) as BrowseRow[]
+
+  const mapped = rows.map((r) => {
+    const alt = JSON.parse(r.alt) as { meanings?: string[]; strokes?: number; on?: string[]; kun?: string[] }
+    return {
+      item: {
+        glyph: r.glyph,
+        level: Number(r.rowKey.replace('n', '')),
+        extra: r.block === 'joyo-extra',
+        meaning: r.meaning ?? (alt.meanings?.[0] ?? ''),
+        progress: summarize(r),
+        strokes: alt.strokes ?? 0,
+      },
+      meanings: alt.meanings ?? [],
+      readings: [...(alt.on ?? []), ...(alt.kun ?? [])],
+    }
+  })
+
+  const filtered = mapped.filter(
+    (k) => progress === 'all' || k.item.progress === progress,
+  )
+  if (!clean.length) return filtered.map((k) => k.item)
+
+  // El LIKE del SQL busca subcadenas, así que «agua» arrastra «paraguas».
+  // Se reordena por relevancia para que la coincidencia exacta mande; el
+  // orden original (frecuencia en prensa) decide los empates.
+  const lower = clean.map((t) => t.toLowerCase())
+  const rank = (k: (typeof filtered)[number]): number => {
+    if (lower.some((t) => k.item.glyph === t)) return 0
+    const meanings = k.meanings.map((m) => m.toLowerCase())
+    const readings = k.readings.map((r) => r.replace(/[.\-]/g, ''))
+    if (lower.some((t) => meanings.includes(t) || readings.includes(t))) return 1
+    if (lower.some((t) => meanings.some((m) => m.startsWith(t)))) return 2
+    return 3
+  }
+
+  return filtered
+    .map((k, i) => ({ k, i, r: rank(k) }))
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .map(({ k }) => k.item)
+}
+
+export function kanjiDetail(glyph: string): KanjiDetail | null {
+  const row = db
+    .prepare(`SELECT ${BROWSE_COLUMNS} ${BROWSE_FROM} AND i.glyph = ? GROUP BY i.id`)
+    .get(glyph) as BrowseRow | undefined
+  if (!row) return null
+
+  const alt = JSON.parse(row.alt) as {
+    on?: string[]
+    kun?: string[]
+    meanings?: string[]
+    strokes?: number
+    freq?: number
+    grade?: number
+  }
+
+  const words = db
+    .prepare(
+      `SELECT i.glyph AS word, i.reading, i.meaning,
+              MIN(c.locked) AS minLocked, MIN(c.state) AS minState
+       FROM item i
+       JOIN card c ON c.item_id = i.id AND c.card_type = 'word'
+       WHERE i.block = 'word' AND i.row_key = ?
+       GROUP BY i.id ORDER BY i.position`,
+    )
+    .all(glyph) as {
+    word: string
+    reading: string
+    meaning: string
+    minLocked: number
+    minState: number
+  }[]
+
+  return {
+    glyph: row.glyph,
+    level: Number(row.rowKey.replace('n', '')),
+    extra: row.block === 'joyo-extra',
+    meaning: row.meaning ?? '',
+    progress: summarize(row),
+    strokes: alt.strokes ?? 0,
+    meanings: alt.meanings ?? [],
+    on: alt.on ?? [],
+    kun: alt.kun ?? [],
+    freq: alt.freq ?? 0,
+    grade: alt.grade ?? 0,
+    nextDue: row.nextDue,
+    words: words.map((w) => ({
+      word: w.word,
+      reading: w.reading,
+      meaning: w.meaning,
+      progress: summarize(w),
+    })),
+  }
+}
+
+/** Cuántos kanji hay en cada estado, para las cifras del explorador. */
+export function kanjiProgressCounts(level = 0): Record<KanjiProgress, number> {
+  const out: Record<KanjiProgress, number> = { locked: 0, new: 0, learning: 0, mature: 0 }
+  for (const k of browseKanji({ level })) out[k.progress]++
+  return out
+}

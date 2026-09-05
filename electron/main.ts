@@ -13,6 +13,10 @@ import {
   exportAll,
   newPerDay,
   setNewPerDay,
+  browseKanji,
+  kanjiDetail,
+  kanjiProgressCounts,
+  type BrowseFilters,
 } from './db'
 
 const isDev = !app.isPackaged
@@ -52,6 +56,9 @@ app.whenReady().then(() => {
   )
   ipcMain.handle('card:preview', (_e, id: number) => previewIntervals(id))
   ipcMain.handle('stats:decks', () => getDeckStats())
+  ipcMain.handle('kanji:browse', (_e, filters: BrowseFilters) => browseKanji(filters))
+  ipcMain.handle('kanji:detail', (_e, glyph: string) => kanjiDetail(glyph))
+  ipcMain.handle('kanji:counts', (_e, level: number) => kanjiProgressCounts(level))
   ipcMain.handle('settings:newPerDay', () => newPerDay())
   ipcMain.handle('settings:setNewPerDay', (_e, value: number) => {
     setNewPerDay(value)

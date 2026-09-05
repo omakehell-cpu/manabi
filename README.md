@@ -60,6 +60,24 @@ Los kana extendidos no piden dirección rōmaji→kana a propósito: `ウォ` y 
 comparten el rōmaji «wo», así que la pregunta sería ambigua. Se practican
 solo por reconocimiento, que es como se usan en la práctica.
 
+## Explorar
+
+El temario completo es consultable sin depender de que la aplicación te
+pregunte: los 2383 kanji en una rejilla, coloreados según su estado (sin
+abrir, por empezar, aprendiendo, asentado). Al pulsar uno se abre su ficha
+con significados, lecturas con audio, trazos, puesto por frecuencia en
+prensa, cuándo vuelve a tocar y sus palabras de ejemplo.
+
+El buscador acepta las tres formas en que uno recuerda un kanji: el carácter
+(`水`), un significado en español (`agua`) o una lectura, escrita en rōmaji
+(`sui`) o en kana. El rōmaji se convierte a hiragana y katakana antes de
+consultar, para no obligar a cambiar de teclado.
+
+Buscar ignora el filtro de nivel a propósito: si escribes 水 quieres
+encontrarlo, no que te digan que no está en el nivel que tienes abierto. Los
+resultados se ordenan por relevancia —coincidencia exacta primero— porque la
+búsqueda por subcadena hacía que «agua» arrastrase 傘, «paraguas».
+
 ## Ritmo de estudio
 
 Dos mecanismos gobiernan cuánto trabajo hay cada día, y son lo que separa
@@ -100,7 +118,8 @@ eso el audio va en cada lectura por separado, y en las palabras completas.
 |---|---|
 | `Intro` | responder / pasar a la siguiente |
 | `2` / `4` | tras acertar: «costó» / «fácil» |
-| `Esc` | salir de la sesión |
+| `Esc` | salir de la sesión, o cerrar la ficha de un kanji |
+| `Cmd`/`Ctrl` + `F` | buscar, en Explorar |
 
 ## Desarrollo
 

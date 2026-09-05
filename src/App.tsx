@@ -4,8 +4,9 @@ import Home from './components/Home'
 import Study from './components/Study'
 import Stats from './components/Stats'
 import Credits from './components/Credits'
+import Explorer from './components/Explorer'
 
-type View = 'home' | 'stats' | 'credits'
+type View = 'home' | 'explore' | 'stats' | 'credits'
 
 export default function App() {
   const [view, setView] = useState<View>('home')
@@ -46,6 +47,9 @@ export default function App() {
           <Tab active={view === 'home'} onClick={() => setView('home')}>
             Mazos
           </Tab>
+          <Tab active={view === 'explore'} onClick={() => setView('explore')}>
+            Explorar
+          </Tab>
           <Tab active={view === 'stats'} onClick={() => setView('stats')}>
             Progreso
           </Tab>
@@ -57,6 +61,7 @@ export default function App() {
 
       <main className="min-h-0 flex-1 overflow-y-auto">
         {view === 'home' && <Home decks={decks} onStudy={setStudying} />}
+        {view === 'explore' && <Explorer />}
         {view === 'stats' && overview && (
           <Stats
             overview={overview}

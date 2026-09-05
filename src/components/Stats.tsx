@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Overview } from '../types'
 import {
   japaneseVoices,
@@ -84,6 +84,8 @@ export default function Stats({ overview, onExport, onReset }: Props) {
         </>
       )}
 
+      <StudySettings />
+
       <VoiceSettings />
 
       <h2 className="mt-12 text-sm tracking-wide text-muted uppercase">Datos</h2>
@@ -114,6 +116,55 @@ function Tile({ value, label }: { value: number | string; label: string }) {
       <p className="text-3xl font-medium tabular-nums">{value}</p>
       <p className="mt-1 text-sm text-muted">{label}</p>
     </div>
+  )
+}
+
+/**
+ * El límite de cartas nuevas es el ajuste que decide si la aplicación se
+ * puede sostener en el tiempo: cada carta nueva arrastra una decena de
+ * repasos futuros, así que sin freno la carga diaria crece hasta volverse
+ * inasumible en un par de semanas.
+ */
+function StudySettings() {
+  const [value, setValue] = useState<number | null>(null)
+
+  useEffect(() => {
+    void window.manabi.newPerDay().then(setValue)
+  }, [])
+
+  if (value === null) return null
+
+  return (
+    <>
+      <h2 className="mt-12 text-sm tracking-wide text-muted uppercase">Ritmo de estudio</h2>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <label htmlFor="nuevas" className="w-24 text-sm text-muted">
+          Nuevas al día
+        </label>
+        <input
+          id="nuevas"
+          type="range"
+          min={0}
+          max={60}
+          step={5}
+          value={value}
+          onChange={(e) => {
+            const v = Number(e.target.value)
+            setValue(v)
+            void window.manabi.setNewPerDay(v)
+          }}
+          className="w-48 accent-[var(--color-accent)]"
+        />
+        <span className="text-sm tabular-nums text-muted">
+          {value === 0 ? 'ninguna' : `${value} por mazo`}
+        </span>
+      </div>
+      <p className="mt-3 max-w-xl text-xs leading-relaxed text-muted">
+        Se aplica a cada mazo por separado. Los repasos que ya tocan nunca se
+        limitan: el tope solo controla cuánto material nuevo entra. Con 20 al día,
+        los 104 hiragana llevan poco más de una semana.
+      </p>
+    </>
   )
 }
 

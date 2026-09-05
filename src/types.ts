@@ -13,6 +13,7 @@ export interface StudyCard {
   block: string
   state: number
   reps: number
+  due: string
 }
 
 export interface DeckStats {
@@ -27,6 +28,7 @@ export interface DeckStats {
   review: number
   suspended: number
   characters: number
+  newRemaining: number
 }
 
 export interface Overview {
@@ -45,10 +47,12 @@ export interface GradeResult {
 }
 
 export interface ManabiApi {
-  getQueue(slug: string, limit?: number): Promise<StudyCard[]>
+  getQueue(slug: string, limit?: number, aheadMinutes?: number): Promise<StudyCard[]>
   grade(cardId: number, rating: 1 | 2 | 3 | 4, durationMs: number): Promise<GradeResult>
   previewIntervals(cardId: number): Promise<Record<number, number>>
   deckStats(): Promise<DeckStats[]>
+  newPerDay(): Promise<number>
+  setNewPerDay(value: number): Promise<number>
   overview(): Promise<Overview>
   resetProgress(): Promise<void>
   exportProgress(): Promise<string | null>

@@ -11,6 +11,8 @@ import {
   getOverview,
   resetProgress,
   exportAll,
+  newPerDay,
+  setNewPerDay,
 } from './db'
 
 const isDev = !app.isPackaged
@@ -42,12 +44,19 @@ function createWindow(): void {
 app.whenReady().then(() => {
   openDatabase(join(app.getPath('userData'), 'manabi.db'))
 
-  ipcMain.handle('queue:get', (_e, slug: string, limit?: number) => getQueue(slug, limit))
+  ipcMain.handle('queue:get', (_e, slug: string, limit?: number, aheadMinutes?: number) =>
+    getQueue(slug, limit, aheadMinutes),
+  )
   ipcMain.handle('card:grade', (_e, id: number, rating: Grade, ms: number) =>
     gradeCard(id, rating, ms),
   )
   ipcMain.handle('card:preview', (_e, id: number) => previewIntervals(id))
   ipcMain.handle('stats:decks', () => getDeckStats())
+  ipcMain.handle('settings:newPerDay', () => newPerDay())
+  ipcMain.handle('settings:setNewPerDay', (_e, value: number) => {
+    setNewPerDay(value)
+    return newPerDay()
+  })
   ipcMain.handle('stats:overview', () => getOverview())
   ipcMain.handle('progress:reset', () => resetProgress())
   ipcMain.handle('progress:export', async () => {

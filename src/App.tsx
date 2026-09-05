@@ -19,9 +19,12 @@ export default function App() {
     setOverview(o)
   }, [])
 
+  // `view` va en las dependencias porque los ajustes de Progreso cambian lo
+  // que Mazos debe mostrar: sin esto, tocar el cupo diario no se reflejaba
+  // en las tarjetas hasta reiniciar la aplicación.
   useEffect(() => {
     void refresh()
-  }, [refresh])
+  }, [refresh, view])
 
   const exitStudy = useCallback(() => {
     setStudying(null)

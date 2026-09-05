@@ -60,6 +60,27 @@ Los kana extendidos no piden dirección rōmaji→kana a propósito: `ウォ` y 
 comparten el rōmaji «wo», así que la pregunta sería ambigua. Se practican
 solo por reconocimiento, que es como se usan en la práctica.
 
+## Ritmo de estudio
+
+Dos mecanismos gobiernan cuánto trabajo hay cada día, y son lo que separa
+usar la aplicación seis meses de abandonarla en tres días.
+
+**Las cartas nuevas tienen cupo.** Veinte por mazo y día de forma
+predeterminada, ajustable en Progreso. Cada carta nueva arrastra una decena
+de repasos futuros, así que sin freno la carga diaria crece hasta volverse
+inasumible en un par de semanas. Los repasos que ya tocan nunca se limitan:
+el tope solo controla cuánto material nuevo entra.
+
+**Las cartas en aprendizaje vuelven dentro de la misma sesión.** FSRS las
+reprograma a 1 minuto si fallas y a 10 si aciertas, contando con verlas otra
+vez el mismo día: ahí es donde se consolidan. La sesión repone la cola en vez
+de terminar tras una pasada.
+
+Al reponer se piden primero las realmente vencidas. Solo si no queda ninguna
+se mira el futuro cercano (20 minutos), y entonces la aplicación ofrece
+terminar en lugar de repetir en bucle la única carta pendiente — el respiro
+entre repeticiones es parte del método, no un hueco que rellenar.
+
 ## Pronunciación
 
 Los botones de audio usan las voces japonesas instaladas en el sistema

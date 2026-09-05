@@ -148,12 +148,22 @@ interface Props {
   onExit: () => void
 }
 
+/** Estado de la sesión cuando ya no hay nada que servir ahora mismo. */
+interface Exhausted {
+  /** Cartas en aprendizaje que volverán en breve. */
+  pending: number
+  /** Minutos hasta la siguiente, redondeados hacia arriba. */
+  minutes: number
+}
+
 export default function Study({ deck, deckName, onExit }: Props) {
   const [queue, setQueue] = useState<StudyCard[] | null>(null)
   const [index, setIndex] = useState(0)
   const [value, setValue] = useState('')
   const [phase, setPhase] = useState<Phase>('asking')
   const [tally, setTally] = useState({ right: 0, wrong: 0 })
+  const [done, setDone] = useState(0)
+  const [exhausted, setExhausted] = useState<Exhausted | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const shownAt = useRef(Date.now())
 
@@ -164,7 +174,47 @@ export default function Study({ deck, deckName, onExit }: Props) {
     })
   }, [deck])
 
-  const card = queue?.[index]
+  /**
+   * Repone la cola en mitad de la sesión.
+   *
+   * FSRS devuelve las cartas nuevas a los 1–10 minutos porque espera verlas
+   * otra vez el mismo día; si la sesión terminase al agotar la primera
+   * tanda, cada carta se vería una sola vez y los pasos de aprendizaje no
+   * servirían de nada.
+   *
+   * Se piden primero las realmente vencidas (`aheadMinutes` a 0). Solo si no
+   * queda ninguna se mira el futuro cercano, y entonces se ofrece la salida
+   * en lugar de repetir en bucle la única carta pendiente.
+   */
+  const refill = useCallback(async () => {
+    const ready = await window.manabi.getQueue(deck, 40, 0)
+    if (ready.length) {
+      setQueue(ready)
+      setIndex(0)
+      shownAt.current = Date.now()
+      return
+    }
+    const soon = await window.manabi.getQueue(deck, 40)
+    if (!soon.length) {
+      setExhausted({ pending: 0, minutes: 0 })
+      return
+    }
+    const next = Math.min(...soon.map((c) => new Date(c.due).getTime()))
+    const minutes = Math.max(1, Math.ceil((next - Date.now()) / 60_000))
+    setExhausted({ pending: soon.length, minutes: Number.isFinite(minutes) ? minutes : 1 })
+  }, [deck])
+
+  /** Continuar aunque las cartas aún no hayan vencido del todo. */
+  const pushOn = useCallback(async () => {
+    const soon = await window.manabi.getQueue(deck, 40)
+    if (!soon.length) return setExhausted({ pending: 0, minutes: 0 })
+    setExhausted(null)
+    setQueue(soon)
+    setIndex(0)
+    shownAt.current = Date.now()
+  }, [deck])
+
+  const card = exhausted ? undefined : queue?.[index]
   const prompt = useMemo(() => (card ? buildPrompt(card) : null), [card])
 
   // Vista previa en vivo de la conversión rōmaji → kana.
@@ -174,10 +224,15 @@ export default function Study({ deck, deckName, onExit }: Props) {
   const advance = useCallback(() => {
     setPhase('asking')
     setValue('')
-    setIndex((i) => i + 1)
+    setDone((d) => d + 1)
+    if (queue && index + 1 >= queue.length) {
+      void refill()
+    } else {
+      setIndex((i) => i + 1)
+    }
     shownAt.current = Date.now()
     inputRef.current?.focus()
-  }, [])
+  }, [queue, index, refill])
 
   const submit = useCallback(async () => {
     if (!card || !prompt || phase !== 'asking' || !value.trim()) return
@@ -249,7 +304,9 @@ export default function Study({ deck, deckName, onExit }: Props) {
     const total = tally.right + tally.wrong
     return (
       <Centered>
-        <p className="text-3xl font-medium">Sesión terminada</p>
+        <p className="text-3xl font-medium">
+          {exhausted?.pending ? 'De momento, hasta aquí' : 'Sesión terminada'}
+        </p>
         <div className="mt-8 flex gap-10 text-center">
           <Figure value={total} label="cartas" />
           <Figure value={tally.right} label="aciertos" tone="ok" />
@@ -259,9 +316,34 @@ export default function Study({ deck, deckName, onExit }: Props) {
             label="precisión"
           />
         </div>
-        <button onClick={onExit} className="mt-10 rounded-lg bg-raised px-5 py-2.5 hover:bg-line">
-          Volver
-        </button>
+
+        {exhausted?.pending ? (
+          <>
+            <p className="mt-8 max-w-md text-center text-muted">
+              Quedan {exhausted.pending} cartas en aprendizaje. Vuelven dentro de{' '}
+              {exhausted.minutes} {exhausted.minutes === 1 ? 'minuto' : 'minutos'}: ese
+              respiro es parte del método, pero puedes seguir ahora si lo prefieres.
+            </p>
+            <div className="mt-8 flex gap-3">
+              <button
+                onClick={() => void pushOn()}
+                className="rounded-lg bg-raised px-5 py-2.5 hover:bg-line"
+              >
+                Seguir ahora
+              </button>
+              <button
+                onClick={onExit}
+                className="rounded-lg bg-fg px-5 py-2.5 font-medium text-ink hover:bg-white"
+              >
+                Terminar
+              </button>
+            </div>
+          </>
+        ) : (
+          <button onClick={onExit} className="mt-10 rounded-lg bg-raised px-5 py-2.5 hover:bg-line">
+            Volver
+          </button>
+        )}
       </Centered>
     )
   }
@@ -278,7 +360,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
           </button>
         </div>
         <div className="text-sm tabular-nums text-muted">
-          {index} / {queue.length}
+          {done} {done === 1 ? 'carta' : 'cartas'} · quedan {queue.length - index}
         </div>
       </header>
 

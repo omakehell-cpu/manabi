@@ -102,6 +102,11 @@ function DeckCard({
               <p className="mt-1.5 text-xs text-muted">
                 {d.review} de {d.total} cartas asentadas · {d.total - d.locked} desbloqueadas
               </p>
+              {d.New > 0 && d.newRemaining === 0 && (
+                <p className="mt-1.5 text-xs text-muted/80">
+                  Hoy no entran más cartas nuevas; el cupo se ajusta en Progreso.
+                </p>
+              )}
             </>
           )}
         </div>

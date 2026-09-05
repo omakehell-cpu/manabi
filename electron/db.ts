@@ -42,6 +42,19 @@ const BLOCK_THRESHOLD = 0.8
 /** Fallos consecutivos tras los que una carta se aparta como leech. */
 const LEECH_LAPSES = 8
 
+/**
+ * Cuánto se pueden adelantar las cartas que están en aprendizaje.
+ *
+ * FSRS las reprograma a 1 minuto si fallas y a 10 si aciertas, contando con
+ * que vuelvan a salir en la misma sesión: ahí es donde se consolidan. Sin
+ * este margen la sesión se daría por terminada antes de que venciera
+ * ninguna, y cada carta se vería una sola vez al día.
+ */
+const LEARN_AHEAD_MINUTES = 20
+
+/** Cartas nuevas por mazo y día si el usuario no ha configurado otra cosa. */
+const DEFAULT_NEW_PER_DAY = 20
+
 const BLOCK_ORDER = ['gojuon', 'dakuten', 'yoon', 'extended'] as const
 
 const scheduler = fsrs(generatorParameters({ enable_fuzz: true }))
@@ -401,22 +414,100 @@ export interface StudyCard {
   block: string
   state: number
   reps: number
+  /** Cuándo vence, en ISO. La sesión lo usa para decir cuánto falta. */
+  due: string
 }
 
-export function getQueue(slug: string, limit = 40): StudyCard[] {
-  return db
-    .prepare(
-      `SELECT c.id AS cardId, i.id AS itemId, d.slug AS deck, d.kind AS deckKind,
+/**
+ * @param aheadMinutes cuánto se adelantan las cartas en aprendizaje. Se pasa
+ *   0 al recargar a mitad de sesión: sin ese cero, una única carta pendiente
+ *   se serviría en bucle cada pocos segundos.
+ */
+export function getQueue(slug: string, limit = 40, aheadMinutes = LEARN_AHEAD_MINUTES): StudyCard[] {
+  const now = new Date()
+  const nowIso = now.toISOString()
+  const horizon = new Date(now.getTime() + aheadMinutes * 60_000).toISOString()
+
+  const columns = `c.id AS cardId, i.id AS itemId, d.slug AS deck, d.kind AS deckKind,
               c.card_type AS cardType, i.glyph, i.reading, i.meaning, i.alt,
-              i.block, c.state, c.reps
+              i.block, c.state, c.reps, c.due`
+
+  // Las que ya están en marcha no tienen cupo: si toca repasarlas, tocan.
+  // A las de aprendizaje (estados 1 y 3) se les permite el adelanto.
+  const inProgress = db
+    .prepare(
+      `SELECT ${columns}
        FROM card c
        JOIN item i ON i.id = c.item_id
        JOIN deck d ON d.id = i.deck_id
-       WHERE d.slug = ? AND c.locked = 0 AND c.suspended = 0 AND c.due <= ?
-       ORDER BY c.state = 0, c.due, i.position
+       WHERE d.slug = ? AND c.locked = 0 AND c.suspended = 0 AND c.state != 0
+         AND ((c.state IN (1, 3) AND c.due <= ?) OR (c.state = 2 AND c.due <= ?))
+       ORDER BY c.due, i.position
        LIMIT ?`,
     )
-    .all(slug, new Date().toISOString(), limit) as StudyCard[]
+    .all(slug, horizon, nowIso, limit) as StudyCard[]
+
+  // Las nuevas sí: cada una arrastra una decena de repasos futuros, y sin
+  // freno la carga se dispara hasta volverse inasumible en dos semanas.
+  const room = Math.max(0, Math.min(newRemainingToday(slug), limit - inProgress.length))
+  const fresh = room
+    ? (db
+        .prepare(
+          `SELECT ${columns}
+           FROM card c
+           JOIN item i ON i.id = c.item_id
+           JOIN deck d ON d.id = i.deck_id
+           WHERE d.slug = ? AND c.locked = 0 AND c.suspended = 0 AND c.state = 0
+             AND c.due <= ?
+           ORDER BY i.position
+           LIMIT ?`,
+        )
+        .all(slug, nowIso, room) as StudyCard[])
+    : []
+
+  return [...inProgress, ...fresh]
+}
+
+function startOfToday(): string {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d.toISOString()
+}
+
+/** Una carta cuenta como estrenada hoy si su primer repaso ha sido hoy. */
+export function newIntroducedToday(slug: string): number {
+  return (
+    db
+      .prepare(
+        `SELECT COUNT(DISTINCT r.card_id) AS n
+         FROM review r
+         JOIN card c ON c.id = r.card_id
+         JOIN item i ON i.id = c.item_id
+         JOIN deck d ON d.id = i.deck_id
+         WHERE d.slug = ? AND r.state_before = 0 AND r.reviewed_at >= ?`,
+      )
+      .get(slug, startOfToday()) as { n: number }
+  ).n
+}
+
+export function newPerDay(): number {
+  const row = db.prepare("SELECT value FROM setting WHERE key = 'new_per_day'").get() as
+    | { value: string }
+    | undefined
+  const parsed = Number(row?.value)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_NEW_PER_DAY
+}
+
+export function setNewPerDay(value: number): void {
+  const clamped = Math.max(0, Math.min(500, Math.round(value)))
+  db.prepare(
+    "INSERT INTO setting (key, value) VALUES ('new_per_day', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+  ).run(String(clamped))
+}
+
+/** Cuántas cartas nuevas admite todavía hoy este mazo. */
+export function newRemainingToday(slug: string): number {
+  return Math.max(0, newPerDay() - newIntroducedToday(slug))
 }
 
 // ---------------------------------------------------------- calificar
@@ -518,16 +609,26 @@ export interface DeckStats {
   suspended: number
   /** Ítems que son caracteres o signos, excluidas las palabras de ejemplo. */
   characters: number
+  /** Cartas nuevas que este mazo admite todavía hoy. */
+  newRemaining: number
 }
 
 export function getDeckStats(): DeckStats[] {
-  return db
+  const now = new Date()
+  const nowIso = now.toISOString()
+  const horizon = new Date(now.getTime() + LEARN_AHEAD_MINUTES * 60_000).toISOString()
+
+  const rows = db
     .prepare(
       `SELECT d.slug, d.name, d.kind,
               COUNT(c.id) AS total,
               SUM(c.locked) AS locked,
-              SUM(CASE WHEN c.locked = 0 AND c.suspended = 0 AND c.due <= @now THEN 1 ELSE 0 END) AS due,
-              SUM(CASE WHEN c.locked = 0 AND c.state = 0 THEN 1 ELSE 0 END) AS New,
+              SUM(CASE WHEN c.locked = 0 AND c.suspended = 0 AND c.state != 0
+                        AND ((c.state IN (1,3) AND c.due <= @horizon)
+                          OR (c.state = 2 AND c.due <= @now))
+                       THEN 1 ELSE 0 END) AS dueInProgress,
+              SUM(CASE WHEN c.locked = 0 AND c.suspended = 0 AND c.state = 0
+                        AND c.due <= @now THEN 1 ELSE 0 END) AS New,
               SUM(CASE WHEN c.state IN (1,3) THEN 1 ELSE 0 END) AS learning,
               SUM(CASE WHEN c.state = 2 THEN 1 ELSE 0 END) AS review,
               SUM(c.suspended) AS suspended,
@@ -537,7 +638,17 @@ export function getDeckStats(): DeckStats[] {
        LEFT JOIN card c ON c.item_id = i.id
        GROUP BY d.id ORDER BY d.position`,
     )
-    .all({ now: new Date().toISOString() }) as DeckStats[]
+    .all({ now: nowIso, horizon }) as (Omit<DeckStats, 'due' | 'newRemaining'> & {
+    dueInProgress: number
+  })[]
+
+  // `due` debe ser lo que la sesión va a servir de verdad, no todo lo que
+  // existe: anunciar «Estudiar 79» y luego entregar 20 sería mentir.
+  return rows.map((r) => {
+    const newRemaining = Math.min(r.New, newRemainingToday(r.slug))
+    const { dueInProgress, ...rest } = r
+    return { ...rest, due: dueInProgress + newRemaining, newRemaining }
+  })
 }
 
 export interface Overview {

@@ -5,7 +5,16 @@
  * Se ejecuta con `npm run check`, sin abrir Electron.
  */
 import { readFileSync, rmSync } from 'node:fs'
-import { openDatabase, getQueue, gradeCard, getDeckStats, getOverview } from '../electron/db'
+import {
+  openDatabase,
+  getQueue,
+  gradeCard,
+  getDeckStats,
+  getOverview,
+  newPerDay,
+  setNewPerDay,
+  newIntroducedToday,
+} from '../electron/db'
 
 const DB = process.env.CHECK_DB ?? '/tmp/manabi-check.db'
 for (const suffix of ['', '-wal', '-shm']) {
@@ -41,8 +50,13 @@ console.log('\nEstado de arranque')
 const q0 = getQueue('hiragana', 500)
 expect('solo gojūon en cola', [...new Set(q0.map((c) => c.block))], (v) => v.length === 1 && v[0] === 'gojuon', 'no deben abrirse dakuten ni yōon')
 expect('solo reconocimiento', [...new Set(q0.map((c) => c.cardType))], (v) => v.length === 1 && v[0] === 'recognition', 'la evocación nace bloqueada')
-expect('cola gojūon', q0.length, (v) => v === 46, 'los 46 signos básicos')
+// Ya no se sirven los 46 de golpe: el cupo diario los reparte en tandas.
+expect('la primera tanda respeta el cupo', q0.length, (v) => v === 20, 'esperado el tope diario')
 expect('vocab cerrado', getQueue('vocab', 500).length, (v) => v === 0, 'ninguna palabra antes de saber kana')
+
+// El resto de comprobaciones necesita avanzar niveles enteros, cosa que el
+// cupo impide a propósito. Se levanta aquí y se restaura al probarlo.
+setNewPerDay(9999)
 
 console.log('\nAsentando el gojūon hiragana…')
 for (let round = 0; round < 10; round++) {
@@ -151,6 +165,44 @@ const leaky = wordsAfter.filter((c) =>
 expect('ninguna usa kanji de niveles posteriores', leaky.length, (v) => v === 0,
   leaky.length ? `p. ej. ${leaky[0].glyph}` : '')
 void openKanji
+
+// ------------------------------------------- ritmo y bucle de aprendizaje
+
+console.log('\nCupo de cartas nuevas')
+setNewPerDay(20)
+expect('valor por defecto', newPerDay(), (v) => v === 20, 'esperado 20')
+
+setNewPerDay(5)
+const limited = getQueue('katakana', 40)
+expect('la cola respeta el cupo', limited.length, (v) => v === 5, 'debía servir solo 5 nuevas')
+
+for (const c of limited) gradeCard(c.cardId, 3, 1000)
+expect('se contabilizan como estrenadas hoy', newIntroducedToday('katakana'), (v) => v === 5, 'esperado 5')
+expect(
+  'agotado el cupo, no entran más nuevas',
+  getQueue('katakana', 40, 0).filter((c) => c.state === 0).length,
+  (v) => v === 0,
+  'el tope no se está aplicando',
+)
+
+const kStats = getDeckStats().find((d) => d.slug === 'katakana')!
+expect('las estadísticas reflejan el cupo', kStats.newRemaining, (v) => v === 0, 'debería anunciar 0 nuevas')
+
+console.log('\nBucle de aprendizaje')
+// Las recién acertadas vuelven a los 10 minutos: sin adelanto no deben
+// aparecer, con adelanto sí. Es lo que permite repetirlas en la sesión.
+const strict = getQueue('katakana', 40, 0)
+const ahead = getQueue('katakana', 40, 20)
+expect('sin adelanto no hay nada que servir', strict.length, (v) => v === 0, 'no deberían haber vencido')
+expect('con adelanto vuelven las de aprendizaje', ahead.length, (v) => v === 5, 'FSRS las puso a 10 min')
+expect(
+  'y son las mismas cartas',
+  ahead.every((c) => limited.some((l) => l.cardId === c.cardId)),
+  (v) => v === true,
+  'deberían ser las recién estudiadas',
+)
+
+setNewPerDay(20)
 
 console.log(failures === 0 ? '\nTodo correcto\n' : `\n${failures} comprobación(es) fallida(s)\n`)
 process.exit(failures === 0 ? 0 : 1)

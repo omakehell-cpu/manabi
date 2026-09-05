@@ -1,0 +1,37 @@
+appId: com.omakehell.manabi
+productName: Manabi
+copyright: © 2026 omakehell
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+
+# better-sqlite3 carga un binario .node en tiempo de ejecución; dentro del
+# asar no se puede hacer dlopen, así que tiene que quedar desempaquetado.
+asarUnpack:
+  - '**/node_modules/better-sqlite3/**'
+
+mac:
+  category: public.app-category.education
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # Sin cuenta de Apple Developer no hay firma ni notarización: la app se
+  # abre con clic derecho → Abrir la primera vez. Para distribuirla de
+  # verdad hay que firmar y notarizar.
+  identity: null
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false

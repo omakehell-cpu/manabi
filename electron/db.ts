@@ -10,6 +10,7 @@ import KANJI_WORDS from '../src/data/kanji-words.json'
 // El trazado vive en el proceso principal y se sirve por petición: son
 // 2 MB que no tiene sentido cargar en el renderer para ver un kanji.
 import KANJI_STROKES from '../src/data/kanji-strokes.json'
+import SENTENCES from '../src/data/sentences.json'
 
 export type CardType = 'recognition' | 'recall' | 'reading' | 'meaning' | 'word'
 
@@ -1426,4 +1427,14 @@ export function browseSimple(slug: string, terms: string[] = []): SimpleBrowseIt
     ...rest,
     progress: summarize({ minLocked, minState }),
   }))
+}
+
+/**
+ * Frase de ejemplo de un kanji. No es una carta: es contexto, para que la
+ * palabra deje de estar suelta. Todos sus kanji pertenecen a niveles ya
+ * estudiados cuando la frase aparece, por construcción del generador.
+ */
+export function sentenceFor(glyph: string): { japanese: string; spanish: string } | null {
+  const found = (SENTENCES as { j: string; e: string; k: string }[]).find((s) => s.k === glyph)
+  return found ? { japanese: found.j, spanish: found.e } : null
 }

@@ -177,6 +177,29 @@ bloque o un nivel, esas cartas siguen abiertas: volver a cerrarlas
 escondería material que ya has visto, y la apertura solo ocurre al cumplir
 el umbral, así que dejarlas no adelanta nada indebido.
 
+## Escritura a mano
+
+Reconocer 鬱 y saber escribirlo son cosas distintas. Desde la ficha de un
+carácter —y desde su lección— se puede dibujar en un lienzo y comprobarlo
+contra el trazado de KanjiVG.
+
+No se compara el parecido del dibujo terminado, sino **cómo se ha hecho**:
+cuántos trazos, en qué orden y en qué dirección. Un carácter dibujado
+empezando por abajo se parece mucho al modelo y está mal escrito, así que
+cada trazo se remuestrea a doce puntos y se compara con el suyo punto por
+punto; comparar el primero del usuario con el primero del modelo es lo que
+detecta el sentido invertido.
+
+El resultado pinta cada trazo en verde o rojo y señala el primero que falla,
+diciendo si además iba en el otro sentido.
+
+## Frases de ejemplo
+
+Cada kanji trae una frase corta donde aparece en uso, con su traducción y
+audio. Salen de Tatoeba y siguen la misma regla que las palabras: **todos**
+sus kanji pertenecen a niveles ya estudiados, así que un ejemplo nunca se
+convierte en un muro. 1738 de los 2383 kanji tienen frase.
+
 ## Orden de trazos
 
 La ficha de cada kanji anima cómo se escribe, trazo a trazo, con datos de
@@ -271,7 +294,11 @@ actualizarlos. Las fuentes pesan más de 100 MB y no se versionan:
 curl -o kanjidic2.xml.gz https://www.edrdg.org/kanjidic/kanjidic2.xml.gz
 curl -o JMdict.gz https://www.edrdg.org/pub/Nihongo/JMdict.gz
 curl -Lo kanjivg.xml.gz https://github.com/KanjiVG/kanjivg/releases/download/r20250816/kanjivg-20250816.xml.gz
+curl -o jpn-spa.tar.bz2 https://downloads.tatoeba.org/exports/per_language/jpn/jpn-spa_links.tsv.bz2
+curl -O https://downloads.tatoeba.org/exports/sentences.tar.bz2
 gunzip kanjidic2.xml.gz JMdict.gz kanjivg.xml.gz
+bunzip2 jpn-spa.tar.bz2 && tar xjf sentences.tar.bz2
+awk -F'\t' '$2=="jpn" || $2=="spa"' sentences.csv > sent-jpn-spa.tsv
 npm pack kanji-data && tar xzf kanji-data-*.tgz   # listas JLPT
 ```
 
@@ -281,6 +308,8 @@ Con todo en un directorio `<fuentes>`:
 node --experimental-strip-types scripts/build-kanji.ts <fuentes>
 node --max-old-space-size=4096 --experimental-strip-types scripts/build-kanji-words.ts <fuentes>
 node --max-old-space-size=4096 --experimental-strip-types scripts/build-kanjivg.ts <fuentes>
+node --max-old-space-size=4096 --experimental-strip-types scripts/build-kana-vocab.ts <fuentes>
+node --max-old-space-size=8192 --experimental-strip-types scripts/build-sentences.ts <fuentes>
 ```
 
 `npm run test` es la red de seguridad: 53 pruebas con Vitest que cubren la
@@ -345,6 +374,7 @@ recogida en la pantalla **Créditos**.
   kanjiapi.dev.
 - [KanjiVG](https://kanjivg.tagaini.net/) de Ulrich Apel — orden de trazos,
   CC BY-SA 3.0.
+- [Tatoeba](https://tatoeba.org) — frases de ejemplo, CC BY 2.0 FR.
 
 Los 75 kanji que KANJIDIC2 no traduce al español —casi todos jōyō
 incorporados en la revisión de 2010— se tradujeron para esta aplicación

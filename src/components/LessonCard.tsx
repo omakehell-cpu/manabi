@@ -3,6 +3,7 @@ import type { StudyCard } from '../types'
 import { cleanReading } from '../lib/speech'
 import Speaker from './Speaker'
 import StrokeOrder from './StrokeOrder'
+import Handwriting from './Handwriting'
 
 interface KanjiAlt {
   on?: string[]
@@ -29,6 +30,8 @@ interface Props {
  */
 export default function LessonCard({ card, position, total, showStrokes, onNext }: Props) {
   const [words, setWords] = useState<{ word: string; reading: string; meaning: string }[]>([])
+  const [sentence, setSentence] = useState<{ japanese: string; spanish: string } | null>(null)
+  const [writing, setWriting] = useState(false)
 
   let alt: unknown = null
   try {
@@ -41,9 +44,16 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
   const kanji = isKanji ? ((alt ?? {}) as KanjiAlt) : null
 
   useEffect(() => {
-    if (!isKanji) return setWords([])
+    if (!isKanji) {
+      setWords([])
+      setSentence(null)
+      return
+    }
     void window.manabi.wordsForKanji(card.glyph).then(setWords)
+    void window.manabi.sentenceFor(card.glyph).then(setSentence)
   }, [card.glyph, isKanji])
+
+  useEffect(() => setWriting(false), [card.cardId])
 
   // Los yōon (きゃ) no existen como una sola entrada en KanjiVG: se dibuja
   // cada carácter por separado.
@@ -55,6 +65,9 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
         Nuevo · {position} de {total}
       </p>
 
+      {writing ? (
+        <Handwriting glyph={strokeChars[0]} size={230} />
+      ) : (
       <div className="flex flex-wrap items-center justify-center gap-8">
         {showStrokes && strokeChars.length <= 2 ? (
           <div className="flex gap-3">
@@ -91,6 +104,17 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
           {!kanji && card.meaning && <p className="mt-2 text-lg text-muted">{card.meaning}</p>}
         </div>
       </div>
+      )}
+
+      {/* Escribirlo una vez al conocerlo fija mucho más que solo verlo. */}
+      {strokeChars.length === 1 && (
+        <button
+          onClick={() => setWriting((w) => !w)}
+          className="mt-5 rounded-lg bg-raised px-4 py-1.5 text-xs hover:bg-line"
+        >
+          {writing ? 'Ver la ficha' : 'Practicar la escritura'}
+        </button>
+      )}
 
       {words.length > 0 && (
         <div className="mt-8 w-full max-w-lg">
@@ -113,6 +137,8 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
         </div>
       )}
 
+      {sentence && <ExampleSentence sentence={sentence} />}
+
       <button
         onClick={onNext}
         className="mt-8 rounded-lg bg-fg px-6 py-2.5 text-sm font-medium text-ink hover:bg-white"
@@ -120,6 +146,23 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
         {position === total ? 'Empezar a practicar' : 'Siguiente'}{' '}
         <span className="text-ink/50">Intro</span>
       </button>
+    </div>
+  )
+}
+
+/** Una frase corta donde el carácter aparece en uso, no aislado. */
+export function ExampleSentence({
+  sentence,
+}: {
+  sentence: { japanese: string; spanish: string }
+}) {
+  return (
+    <div className="mt-6 w-full max-w-lg rounded-xl border border-line bg-surface px-5 py-4">
+      <div className="flex items-start gap-2">
+        <p className="jp flex-1 text-lg leading-relaxed">{sentence.japanese}</p>
+        <Speaker text={sentence.japanese} size="md" />
+      </div>
+      <p className="mt-2 text-sm text-muted">{sentence.spanish}</p>
     </div>
   )
 }

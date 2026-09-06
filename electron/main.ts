@@ -23,6 +23,7 @@ import {
   suspendCard,
   getForecast,
   kanjiStrokes,
+  sentenceFor,
   undoLastReview,
   canUndo,
   getCard,
@@ -96,6 +97,7 @@ app.whenReady().then(() => {
     return lessonBatchSize()
   })
   ipcMain.handle('kanji:words', (_e, glyph: string) => wordsForKanji(glyph))
+  ipcMain.handle('kanji:sentence', (_e, glyph: string) => sentenceFor(glyph))
   ipcMain.handle('settings:retention', () => retention())
   ipcMain.handle('settings:setRetention', (_e, v: number) => {
     setRetention(v)

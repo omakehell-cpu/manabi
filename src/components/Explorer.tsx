@@ -4,6 +4,8 @@ import type { KanjiBrowseItem, KanjiDetail, KanjiProgress, SimpleBrowseItem } fr
 import { cleanReading } from '../lib/speech'
 import Speaker from './Speaker'
 import StrokeOrder from './StrokeOrder'
+import { ExampleSentence } from './LessonCard'
+import Handwriting from './Handwriting'
 
 const LEVELS = [0, 5, 4, 3, 2, 1] as const
 
@@ -231,6 +233,14 @@ export default function Explorer() {
 }
 
 function DetailPanel({ detail, onClose }: { detail: KanjiDetail; onClose: () => void }) {
+  const [sentence, setSentence] = useState<{ japanese: string; spanish: string } | null>(null)
+  const [writing, setWriting] = useState(false)
+
+  useEffect(() => {
+    void window.manabi.sentenceFor(detail.glyph).then(setSentence)
+    setWriting(false)
+  }, [detail.glyph])
+
   const due = detail.nextDue ? new Date(detail.nextDue) : null
   const dueLabel =
     detail.progress === 'locked'
@@ -248,9 +258,16 @@ function DetailPanel({ detail, onClose }: { detail: KanjiDetail; onClose: () => 
         onClick={(e) => e.stopPropagation()}
         className="max-h-full w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-7"
       >
-        <div className="flex items-start gap-6">
-          <StrokeOrder glyph={detail.glyph} size={150} />
-          <div className="min-w-0 flex-1">
+        {/* El lienzo de escritura y sus controles son más anchos que el
+            trazado: en horizontal aplastaban el texto a una columna de una
+            palabra por línea, así que ahí se apila. */}
+        <div className={writing ? 'flex flex-col items-center gap-5' : 'flex items-start gap-6'}>
+          {writing ? (
+            <Handwriting glyph={detail.glyph} size={230} />
+          ) : (
+            <StrokeOrder glyph={detail.glyph} size={150} />
+          )}
+          <div className={writing ? 'w-full text-center' : 'min-w-0 flex-1'}>
             <p className="text-lg">{detail.meanings.join(', ')}</p>
             <p className="mt-2 text-sm text-muted">
               N{detail.level}
@@ -258,14 +275,22 @@ function DetailPanel({ detail, onClose }: { detail: KanjiDetail; onClose: () => 
               {detail.freq > 0 && ` · nº ${detail.freq} por frecuencia en prensa`}
             </p>
             <p className="mt-1 text-sm text-muted">{dueLabel}</p>
+            <button
+              onClick={() => setWriting((w) => !w)}
+              className="mt-3 rounded-lg bg-raised px-3 py-1.5 text-xs hover:bg-line"
+            >
+              {writing ? 'Ver el trazado' : 'Practicar escritura'}
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="shrink-0 rounded-md px-2 py-1 text-muted hover:bg-raised hover:text-fg"
-          >
-            ✕
-          </button>
+          {!writing && (
+            <button
+              onClick={onClose}
+              aria-label="Cerrar"
+              className="shrink-0 rounded-md px-2 py-1 text-muted hover:bg-raised hover:text-fg"
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         <div className="mt-6 space-y-2">
@@ -292,6 +317,13 @@ function DetailPanel({ detail, onClose }: { detail: KanjiDetail; onClose: () => 
             JMdict no tiene traducción al español para ninguna palabra frecuente que use
             solo kanji ya estudiados.
           </p>
+        )}
+
+        {sentence && (
+          <>
+            <h3 className="mt-7 text-xs tracking-wide text-muted uppercase">En una frase</h3>
+            <ExampleSentence sentence={sentence} />
+          </>
         )}
       </div>
     </div>

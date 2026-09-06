@@ -26,6 +26,7 @@ import {
   getForecast,
   kanjiStrokes,
   sentenceFor,
+  componentsOf,
   undoLastReview,
   canUndo,
   getCard,
@@ -161,6 +162,7 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('kanji:words', (_e, glyph: string) => wordsForKanji(glyph))
   ipcMain.handle('kanji:sentence', (_e, glyph: string) => sentenceFor(glyph))
+  ipcMain.handle('kanji:components', (_e, glyph: string) => componentsOf(glyph))
   ipcMain.handle('settings:retention', () => retention())
   ipcMain.handle('settings:setRetention', (_e, v: number) => {
     setRetention(v)

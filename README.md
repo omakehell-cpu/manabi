@@ -306,6 +306,28 @@ audio. Salen de Tatoeba y siguen la misma regla que las palabras: **todos**
 sus kanji pertenecen a niveles ya estudiados, así que un ejemplo nunca se
 convierte en un muro. 1738 de los 2383 kanji tienen frase.
 
+## Componentes y radicales
+
+Los kanji se estudian por frecuencia, así que aparecen caracteres complejos
+sin haber visto sus piezas. La ficha de cada uno muestra en qué se
+descompone: 休 es 亻 más 木 —persona junto a un árbol, de ahí «descansar»—,
+señalando cuál es el radical, cómo se llama y dónde va.
+
+Las piezas que ya se dominan salen marcadas, que es lo que enseña que un
+carácter difícil suele ser una combinación de conocidos.
+
+Los datos salen de KanjiVG, que además de los trazos marca los componentes.
+Solo se toma el primer nivel: 語 es 言 más 吾 y ahí conviene parar, porque
+bajar más devuelve trazos sueltos que no significan nada. 1918 de los 2383
+kanji se descomponen; el resto son simples.
+
+Los radicales que no existen como kanji suelto —氵 por 水, 亻 por 人— llevan
+su significado escrito para esta aplicación, en
+[src/data/radicals.ts](src/data/radicals.ts). Con eso, el 87 % de los
+componentes tiene explicación; de las piezas restantes, muchas son elementos
+puramente fonéticos, y ahí la interfaz muestra el carácter y calla en lugar
+de inventar un significado.
+
 ## Orden de trazos
 
 La ficha de cada kanji anima cómo se escribe, trazo a trazo, con datos de

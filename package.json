@@ -21,7 +21,8 @@
     "data:vocab": "node --max-old-space-size=4096 --experimental-strip-types scripts/build-kana-vocab.ts",
     "data:sentences": "node --max-old-space-size=8192 --experimental-strip-types scripts/build-sentences.ts",
     "data:vocabulary": "node --max-old-space-size=8192 --experimental-strip-types scripts/build-vocabulary.ts",
-    "data:conjugation": "node --experimental-strip-types scripts/build-conjugation.ts"
+    "data:conjugation": "node --experimental-strip-types scripts/build-conjugation.ts",
+    "data:components": "node --max-old-space-size=4096 --experimental-strip-types scripts/build-components.ts"
   },
   "dependencies": {
     "@fontsource/noto-sans-jp": "^5.3.0",

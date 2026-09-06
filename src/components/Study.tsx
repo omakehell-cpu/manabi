@@ -4,6 +4,7 @@ import { checkAnswer, maskAnswer, toTargetKana, type CheckMode } from '../lib/an
 import { cleanReading } from '../lib/speech'
 import Speaker from './Speaker'
 import StrokeOrder from './StrokeOrder'
+import Components from './Components'
 import LessonCard from './LessonCard'
 import { strokeVisibility, type StrokeMode } from '../lib/prefs'
 import { FORMS } from '../lib/conjugation'
@@ -1006,6 +1007,7 @@ function KanjiPanel({
       {detail.strokes > 0 && (
         <p className="mt-3 text-center text-xs text-muted">{detail.strokes} trazos</p>
       )}
+      <Components glyph={glyph} />
     </div>
   )
 }

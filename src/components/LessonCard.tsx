@@ -5,6 +5,7 @@ import Speaker from './Speaker'
 import StrokeOrder from './StrokeOrder'
 import Handwriting from './Handwriting'
 import { FORMS } from '../lib/conjugation'
+import Components from './Components'
 
 interface KanjiAlt {
   on?: string[]
@@ -199,6 +200,12 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
         >
           {writing ? 'Ver la ficha' : 'Practicar la escritura'}
         </button>
+      )}
+
+      {isKanji && (
+        <div className="mt-6 w-full max-w-lg">
+          <Components glyph={card.glyph} />
+        </div>
       )}
 
       {words.length > 0 && (

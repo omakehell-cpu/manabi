@@ -25,6 +25,7 @@ import {
   getCard,
   previewIntervals,
   suspendCard,
+  componentsOf,
   retention,
   setRetention,
 } from '../electron/db'
@@ -442,6 +443,44 @@ describe('explorador', () => {
   it('refleja el progreso real', () => {
     expect(browseKanji({ level: 5 }).filter((k) => k.progress === 'locked')).toHaveLength(0)
     expect(browseKanji({ level: 1 }).every((k) => k.progress === 'locked')).toBe(true)
+  })
+})
+
+describe('componentes de los kanji', () => {
+  it('descompone en las piezas correctas', () => {
+    const partes = (g: string) => componentsOf(g).map((c) => c.glyph)
+    // Sol más luna: de ahí «brillante».
+    expect(partes('明')).toEqual(['日', '月'])
+    // Persona junto a árbol: descansar.
+    expect(partes('休')).toEqual(['亻', '木'])
+  })
+
+  it('se queda en el primer nivel', () => {
+    // KanjiVG numera los grupos de forma plana aunque estén anidados, así
+    // que sin controlar la profundidad 語 daba siete piezas en vez de dos.
+    expect(componentsOf('語').map((c) => c.glyph)).toEqual(['言', '吾'])
+  })
+
+  it('señala cuál es el radical', () => {
+    const radicales = componentsOf('海').filter((c) => c.isRadical)
+    expect(radicales.map((c) => c.glyph)).toEqual(['氵'])
+  })
+
+  it('explica los radicales que no existen como kanji suelto', () => {
+    const agua = componentsOf('海').find((c) => c.glyph === '氵')!
+    expect(agua.meaning).toContain('agua')
+    expect(agua.name).toBe('sanzui')
+  })
+
+  it('no inventa descomposición para los kanji simples', () => {
+    expect(componentsOf('日')).toEqual([])
+    expect(componentsOf('一')).toEqual([])
+  })
+
+  it('marca las piezas ya estudiadas', () => {
+    // A estas alturas N5 está asentado, así que 日 debería figurar sabido.
+    const dia = componentsOf('明').find((c) => c.glyph === '日')!
+    expect(dia.known).toBe(true)
   })
 })
 

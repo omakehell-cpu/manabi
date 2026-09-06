@@ -6,6 +6,7 @@ import Speaker from './Speaker'
 import StrokeOrder from './StrokeOrder'
 import { ExampleSentence } from './LessonCard'
 import Handwriting from './Handwriting'
+import Components from './Components'
 
 const LEVELS = [0, 5, 4, 3, 2, 1] as const
 
@@ -303,6 +304,8 @@ function DetailPanel({ detail, onClose }: { detail: KanjiDetail; onClose: () => 
           {detail.on.length > 0 && <ReadingRow label="ON" readings={detail.on} />}
           {detail.kun.length > 0 && <ReadingRow label="KUN" readings={detail.kun} />}
         </div>
+
+        <Components glyph={detail.glyph} />
 
         <h3 className="mt-7 text-xs tracking-wide text-muted uppercase">
           {detail.words.length ? 'Palabras de ejemplo' : 'Sin palabras de ejemplo'}

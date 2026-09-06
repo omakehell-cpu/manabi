@@ -14,6 +14,8 @@ import SENTENCES from '../src/data/sentences.json'
 import VOCABULARY from '../src/data/vocabulary.json'
 import CONJUGATION from '../src/data/conjugation.json'
 import { GRAMMAR, answerOf, blanked, plain } from '../src/data/grammar'
+import COMPONENTS from '../src/data/components.json'
+import { RADICALS } from '../src/data/radicals'
 
 export type CardType =
   | 'recognition'
@@ -1739,4 +1741,63 @@ export function browseSimple(slug: string, terms: string[] = []): SimpleBrowseIt
 export function sentenceFor(glyph: string): { japanese: string; spanish: string } | null {
   const found = (SENTENCES as { j: string; e: string; k: string }[]).find((s) => s.k === glyph)
   return found ? { japanese: found.j, spanish: found.e } : null
+}
+
+// ------------------------------------------------------- componentes
+
+export interface KanjiComponent {
+  glyph: string
+  /** Qué significa, venga del temario o de la tabla de radicales. */
+  meaning: string
+  /** Nombre japonés del radical, si lo tiene. */
+  name?: string
+  /** Dónde va dentro del carácter. */
+  position?: string
+  /** Si es el radical clasificador. */
+  isRadical: boolean
+  /** Si es un kanji del temario que ya se ha asentado. */
+  known: boolean
+}
+
+/**
+ * En qué partes se descompone un kanji.
+ *
+ * Los kanji se estudian por frecuencia, así que aparecen caracteres
+ * complejos sin haber visto sus piezas. Ver que 明 es 日 más 月 —sol y luna,
+ * de ahí «brillante»— convierte un dibujo arbitrario en algo con lógica, y
+ * saber cuáles ya se dominan hace el resto.
+ */
+export function componentsOf(glyph: string): KanjiComponent[] {
+  const parts = (COMPONENTS as Record<string, { c: string; p?: string; r?: 1 }[]>)[glyph]
+  if (!parts?.length) return []
+
+  const known = new Set(
+    (
+      db
+        .prepare(
+          `SELECT i.glyph FROM card c
+           JOIN item i ON i.id = c.item_id
+           JOIN deck d ON d.id = i.deck_id
+           WHERE d.kind = 'kanji' AND i.block != 'word'
+             AND c.card_type = 'meaning' AND c.state >= ?`,
+        )
+        .all(MATURE) as { glyph: string }[]
+    ).map((r) => r.glyph),
+  )
+
+  const meanings = new Map(
+    (KANJI as KanjiJson[]).map((r) => [r.k, r.m.slice(0, 2).join(', ')]),
+  )
+
+  return parts.map((part) => {
+    const radical = RADICALS[part.c]
+    return {
+      glyph: part.c,
+      meaning: meanings.get(part.c) ?? radical?.meaning ?? '',
+      ...(radical?.name ? { name: radical.name } : {}),
+      ...(part.p ? { position: part.p } : {}),
+      isRadical: part.r === 1,
+      known: known.has(part.c),
+    }
+  })
 }

@@ -123,6 +123,15 @@ export interface UndoResult {
   rating: number
 }
 
+export interface KanjiComponent {
+  glyph: string
+  meaning: string
+  name?: string
+  position?: string
+  isRadical: boolean
+  known: boolean
+}
+
 export interface ManabiApi {
   platform: string
   getQueue(slug: string, limit?: number, aheadMinutes?: number): Promise<StudyCard[]>
@@ -148,6 +157,7 @@ export interface ManabiApi {
   setLessonBatch(v: number): Promise<number>
   wordsForKanji(glyph: string): Promise<{ word: string; reading: string; meaning: string }[]>
   sentenceFor(glyph: string): Promise<{ japanese: string; spanish: string } | null>
+  componentsOf(glyph: string): Promise<KanjiComponent[]>
   retention(): Promise<number>
   setRetention(v: number): Promise<number>
   getSetting(key: string): Promise<string | null>

@@ -12,6 +12,11 @@ interface KanjiAlt {
   strokes?: number
 }
 
+interface VocabAlt {
+  others?: string[]
+  pos?: string
+}
+
 interface Props {
   card: StudyCard
   /** Posición dentro de la tanda, para orientar al que estudia. */
@@ -42,6 +47,7 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
 
   const isKanji = card.deckKind === 'kanji' && card.block !== 'word'
   const kanji = isKanji ? ((alt ?? {}) as KanjiAlt) : null
+  const vocab = card.deckKind === 'vocabulary' ? ((alt ?? {}) as VocabAlt) : null
 
   useEffect(() => {
     if (!isKanji) {
@@ -111,7 +117,19 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
             </div>
           )}
 
-          {!kanji && card.meaning && <p className="mt-2 text-lg text-muted">{card.meaning}</p>}
+          {!kanji && card.meaning && (
+            <>
+              <p className="mt-2 text-lg">
+                {card.meaning}
+                {vocab?.pos && (
+                  <span className="ml-2 text-sm text-muted">{vocab.pos}</span>
+                )}
+              </p>
+              {vocab?.others && vocab.others.length > 0 && (
+                <p className="mt-1 text-sm text-muted">también: {vocab.others.join(', ')}</p>
+              )}
+            </>
+          )}
 
         </div>
       </div>

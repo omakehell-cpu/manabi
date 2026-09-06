@@ -167,10 +167,13 @@ function StudySettings() {
           {value === 0 ? 'ninguna' : `${value} por mazo`}
         </span>
       </div>
+      <TotalCap />
+
       <p className="mt-3 max-w-xl text-xs leading-relaxed text-muted">
-        Se aplica a cada mazo por separado. Los repasos que ya tocan nunca se
-        limitan: el tope solo controla cuánto material nuevo entra. Con 20 al día,
-        los 104 hiragana llevan poco más de una semana.
+        El primero se aplica a cada mazo por separado y el segundo a todos juntos.
+        Con trece mazos, veinte por mazo serían 260 cartas nuevas al día: el tope
+        general es lo que impide esa avalancha. Los repasos que ya tocan nunca se
+        limitan.
       </p>
 
       <RetentionSetting />
@@ -263,6 +266,42 @@ function RetentionSetting() {
         partir de ahora.
       </p>
     </>
+  )
+}
+
+/** Tope de cartas nuevas sumando todos los mazos. */
+function TotalCap() {
+  const [value, setValue] = useState<number | null>(null)
+
+  useEffect(() => {
+    void window.manabi.newPerDayTotal().then(setValue)
+  }, [])
+
+  if (value === null) return null
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-3">
+      <label htmlFor="tope" className="w-24 text-sm text-muted">
+        En total
+      </label>
+      <input
+        id="tope"
+        type="range"
+        min={0}
+        max={200}
+        step={10}
+        value={value}
+        onChange={(e) => {
+          const v = Number(e.target.value)
+          setValue(v)
+          void window.manabi.setNewPerDayTotal(v)
+        }}
+        className="w-48 accent-[var(--color-accent)]"
+      />
+      <span className="text-sm tabular-nums text-muted">
+        {value === 0 ? 'ninguna' : `${value} al día`}
+      </span>
+    </div>
   )
 }
 

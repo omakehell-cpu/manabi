@@ -11,6 +11,8 @@ import {
   newPerDay,
   setNewPerDay,
   newIntroducedToday,
+  newPerDayTotal,
+  setNewPerDayTotal,
   lessonBatchSize,
   browseKanji,
   kanjiDetail,
@@ -115,8 +117,9 @@ describe('lecciones: nada se examina sin presentarse', () => {
 
 describe('progresión por bloques', () => {
   beforeAll(() => {
-    // El cupo diario se prueba aparte; aquí estorbaría.
+    // Los dos cupos se prueban aparte; aquí estorbarían.
     setNewPerDay(9999)
+    setNewPerDayTotal(100000)
     presentAll('hiragana')
   })
 
@@ -196,7 +199,7 @@ describe('vocabulario del JLPT', () => {
   it('reparte las palabras en cinco niveles', () => {
     const stats = getDeckStats().filter((d) => d.kind === 'vocabulary')
     expect(stats).toHaveLength(5)
-    expect(stats.reduce((n, d) => n + d.characters, 0)).toBe(6483)
+    expect(stats.reduce((n, d) => n + d.characters, 0)).toBe(6689)
   })
 
   it('N5 abierto y el resto esperando', () => {
@@ -239,6 +242,7 @@ describe('vocabulario del JLPT', () => {
 
 describe('cupo diario y bucle de aprendizaje', () => {
   it('las lecciones respetan el cupo', () => {
+    setNewPerDayTotal(100000)
     setNewPerDay(5)
     const batch = getLessons('katakana', 40)
     expect(batch).toHaveLength(5)
@@ -261,6 +265,7 @@ describe('cupo diario y bucle de aprendizaje', () => {
   it('el valor por defecto del cupo es 20', () => {
     setNewPerDay(20)
     expect(newPerDay()).toBe(20)
+    setNewPerDay(9999)
   })
 })
 
@@ -292,6 +297,75 @@ describe('retención objetivo', () => {
     setRetention(0.99)
     expect(retention()).toBeLessThanOrEqual(0.97)
     setRetention(0.9)
+  })
+})
+
+describe('tope global de cartas nuevas', () => {
+  it('existe además del cupo por mazo', () => {
+    expect(newPerDayTotal()).toBeGreaterThan(0)
+  })
+
+  it('manda el más restrictivo de los dos', () => {
+    // Con trece mazos, veinte por mazo serían 260 nuevas al día. El tope
+    // general es lo que impide esa avalancha.
+    setNewPerDay(20)
+    setNewPerDayTotal(0)
+    expect(getLessons('katakana', 40)).toHaveLength(0)
+
+    setNewPerDayTotal(3)
+    expect(getLessons('katakana', 40).length).toBeLessThanOrEqual(3)
+
+    setNewPerDayTotal(100000)
+    setNewPerDay(9999)
+  })
+})
+
+describe('calidad del vocabulario', () => {
+  it('cada palabra lleva su categoría gramatical', () => {
+    const vocab = JSON.parse(readFileSync('src/data/vocabulary.json', 'utf8')) as {
+      w: string
+      m: string
+      p: string
+      o: string[]
+      l: number
+    }[]
+    const conPos = vocab.filter((v) => v.p).length
+    expect(conPos / vocab.length).toBeGreaterThan(0.95)
+  })
+
+  it('distingue el sustantivo del adjetivo cuando comparten significado', () => {
+    const vocab = JSON.parse(readFileSync('src/data/vocabulary.json', 'utf8')) as {
+      w: string
+      p: string
+    }[]
+    // 青 y 青い son ambos «azul»; sin la categoría no habría forma de saber
+    // cuál es cuál.
+    expect(vocab.find((v) => v.w === '青')?.p).toBe('sust.')
+    expect(vocab.find((v) => v.w === '青い')?.p).toBe('adj-i')
+  })
+
+  it('no afirma la transitividad cuando JMdict mezcla lecturas', () => {
+    const vocab = JSON.parse(readFileSync('src/data/vocabulary.json', 'utf8')) as {
+      w: string
+      p: string
+    }[]
+    // 開く es あく (intransitivo) y ひらく (transitivo) en la misma entrada:
+    // vale más callar que enseñar lo contrario.
+    expect(vocab.find((v) => v.w === '開く')?.p).toBe('verbo')
+  })
+
+  it('las otras acepciones no se aceptan como respuesta', () => {
+    const vocab = JSON.parse(readFileSync('src/data/vocabulary.json', 'utf8')) as {
+      w: string
+      m: string
+      a: string[]
+      o: string[]
+    }[]
+    const au = vocab.find((v) => v.w === '会う')!
+    expect(au.o.length).toBeGreaterThan(0)
+    // «tener un accidente» viene de 遭う, que comparte entrada en JMdict:
+    // se enseña como información, pero darla por buena sería falso.
+    expect(au.a).not.toContain(au.o[0])
   })
 })
 
@@ -350,6 +424,7 @@ describe('cartas apartadas', () => {
 
   it('se aparta al octavo fallo', () => {
     setNewPerDay(9999)
+    setNewPerDayTotal(100000)
     presentAll('hiragana')
     const card = getQueue('hiragana', 1, 999)[0]
     victima = card.cardId

@@ -29,6 +29,8 @@ interface Prompt {
   audio?: string
   kanji?: KanjiDetail
   word?: { reading: string; meaning: string }
+  /** Otras acepciones: se enseñan al responder, no se aceptan como respuesta. */
+  others?: string[]
 }
 
 function buildPrompt(card: StudyCard): Prompt {
@@ -91,19 +93,29 @@ function buildPrompt(card: StudyCard): Prompt {
   }
 
   const kanaAlts = Array.isArray(parsed) ? (parsed as string[]) : []
-  const vocabAlts = (parsed ?? {}) as { reading?: string[]; meaning?: string[] }
+  const vocabAlts = (parsed ?? {}) as {
+    reading?: string[]
+    meaning?: string[]
+    others?: string[]
+    pos?: string
+  }
 
   if (card.deckKind === 'vocabulary' || card.deckKind === 'vocab') {
     if (card.cardType === 'recognition') {
       return {
         stimulus: card.glyph,
         stimulusIsJapanese: true,
-        question: '¿Qué significa?',
+        // La categoría va en la pregunta porque a menudo es lo único que
+        // separa dos palabras: 青 y 青い son ambas «azul», sustantivo una y
+        // adjetivo la otra. En N5 hay 33 significados compartidos por 69
+        // palabras, y en N1 son 220 por 488.
+        question: vocabAlts.pos ? `¿Qué significa? · ${vocabAlts.pos}` : '¿Qué significa?',
         mode: 'meaning',
         expected: card.meaning ?? '',
         alternatives: vocabAlts.meaning ?? [],
         placeholder: 'significado en español',
         audio: card.glyph,
+        others: vocabAlts.others ?? [],
       }
     }
     return {
@@ -741,6 +753,12 @@ export default function Study({ deck, deckName, onExit }: Props) {
                 </p>
               )}
             </div>
+          )}
+
+          {answered && prompt.others && prompt.others.length > 0 && (
+            <p className="mt-4 text-center text-sm text-muted">
+              también: {prompt.others.join(', ')}
+            </p>
           )}
 
           {phase === 'right' && prompt.audio && !prompt.word && (

@@ -13,6 +13,8 @@ import {
   exportAll,
   newPerDay,
   setNewPerDay,
+  newPerDayTotal,
+  setNewPerDayTotal,
   browseKanji,
   kanjiDetail,
   kanjiProgressCounts,
@@ -106,6 +108,11 @@ app.whenReady().then(() => {
   ipcMain.handle('settings:get', (_e, key: string) => getSetting(key))
   ipcMain.handle('settings:set', (_e, key: string, value: string) => setSetting(key, value))
   ipcMain.handle('settings:newPerDay', () => newPerDay())
+  ipcMain.handle('settings:newPerDayTotal', () => newPerDayTotal())
+  ipcMain.handle('settings:setNewPerDayTotal', (_e, v: number) => {
+    setNewPerDayTotal(v)
+    return newPerDayTotal()
+  })
   ipcMain.handle('settings:setNewPerDay', (_e, value: number) => {
     setNewPerDay(value)
     return newPerDay()

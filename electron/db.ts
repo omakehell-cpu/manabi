@@ -34,7 +34,9 @@ interface VocabularyJson {
   r: string
   m: string
   a: string[]
+  o: string[]
   l: number
+  p: string
 }
 
 /** Forma de cada registro en src/data/vocab.json. */
@@ -79,6 +81,15 @@ const LEARN_AHEAD_MINUTES = 20
 
 /** Cartas nuevas por mazo y día si el usuario no ha configurado otra cosa. */
 const DEFAULT_NEW_PER_DAY = 20
+
+/**
+ * Tope de cartas nuevas al día sumando TODOS los mazos.
+ *
+ * El límite por mazo dejó de frenar nada al crecer el temario: con trece
+ * mazos a veinte cada uno entrarían 260 cartas nuevas diarias, que es
+ * exactamente la avalancha que el cupo existía para evitar.
+ */
+const DEFAULT_NEW_PER_DAY_TOTAL = 40
 
 /**
  * Cuántos elementos se presentan juntos antes de examinarlos.
@@ -297,7 +308,7 @@ function seed(): void {
           deck_id: id,
           glyph: r.w,
           reading: r.r,
-          alt: JSON.stringify({ meaning: r.a, reading: [] }),
+          alt: JSON.stringify({ meaning: r.a, reading: [], others: r.o, pos: r.p }),
           meaning: r.m,
           block: 'jlpt',
           row_key: `n${level}`,
@@ -638,6 +649,18 @@ function startOfToday(): string {
   return d.toISOString()
 }
 
+/** Cartas estrenadas hoy en todos los mazos, para el tope global. */
+export function newIntroducedTodayTotal(): number {
+  return (
+    db
+      .prepare(
+        `SELECT COUNT(DISTINCT r.card_id) AS n
+         FROM review r WHERE r.state_before = 0 AND r.reviewed_at >= ?`,
+      )
+      .get(startOfToday()) as { n: number }
+  ).n
+}
+
 /** Una carta cuenta como estrenada hoy si su primer repaso ha sido hoy. */
 export function newIntroducedToday(slug: string): number {
   return (
@@ -685,6 +708,14 @@ export function setNewPerDay(value: number): void {
   setSetting('new_per_day', String(Math.max(0, Math.min(500, Math.round(value)))))
 }
 
+export function newPerDayTotal(): number {
+  return numericSetting('new_per_day_total', DEFAULT_NEW_PER_DAY_TOTAL, 0, 1000)
+}
+
+export function setNewPerDayTotal(value: number): void {
+  setSetting('new_per_day_total', String(Math.max(0, Math.min(1000, Math.round(value)))))
+}
+
 /** Cuántos elementos se presentan juntos antes de examinarlos. */
 export function lessonBatchSize(): number {
   return numericSetting('lesson_batch', DEFAULT_LESSON_BATCH, 1, 20)
@@ -694,9 +725,14 @@ export function setLessonBatchSize(value: number): void {
   setSetting('lesson_batch', String(Math.max(1, Math.min(20, Math.round(value)))))
 }
 
-/** Cuántas cartas nuevas admite todavía hoy este mazo. */
+/**
+ * Cuántas cartas nuevas admite todavía hoy este mazo, respetando los dos
+ * topes: el suyo y el del conjunto. Manda el más restrictivo.
+ */
 export function newRemainingToday(slug: string): number {
-  return Math.max(0, newPerDay() - newIntroducedToday(slug))
+  const perDeck = newPerDay() - newIntroducedToday(slug)
+  const overall = newPerDayTotal() - newIntroducedTodayTotal()
+  return Math.max(0, Math.min(perDeck, overall))
 }
 
 // ---------------------------------------------------------- calificar

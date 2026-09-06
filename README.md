@@ -11,7 +11,7 @@ Funciona sin conexión: todo el progreso vive en una base SQLite local.
 | **Katakana** | los mismos 104 + 25 extendidos (ファ, ヴィ, ティ…) |
 | **Vocabulario en kana** | 434 palabras leídas en kana, generadas desde JMdict |
 | **Kanji N5 → N1** | 2383 caracteres con 5443 palabras de ejemplo |
-| **Vocabulario N5 → N1** | 6483 palabras del JLPT, en cinco niveles |
+| **Vocabulario N5 → N1** | 6689 palabras del JLPT, en cinco niveles |
 
 ### Los cinco niveles
 
@@ -147,11 +147,11 @@ ahí la pista es su primer trazo.
 Dos mecanismos gobiernan cuánto trabajo hay cada día, y son lo que separa
 usar la aplicación seis meses de abandonarla en tres días.
 
-**Las cartas nuevas tienen cupo.** Veinte por mazo y día de forma
-predeterminada, ajustable en Progreso. Cada carta nueva arrastra una decena
-de repasos futuros, así que sin freno la carga diaria crece hasta volverse
-inasumible en un par de semanas. Los repasos que ya tocan nunca se limitan:
-el tope solo controla cuánto material nuevo entra.
+**Las cartas nuevas tienen dos topes.** Veinte por mazo y día, y cuarenta
+sumando todos, ambos ajustables en Progreso. El segundo hace falta porque el
+primero dejó de frenar al crecer el temario: con trece mazos a veinte cada
+uno entrarían **260 cartas nuevas al día**, que es exactamente la avalancha
+que el cupo existía para evitar. Los repasos que ya tocan nunca se limitan.
 
 **Las cartas en aprendizaje vuelven dentro de la misma sesión.** FSRS las
 reprograma a 1 minuto si fallas y a 10 si aciertas, contando con verlas otra
@@ -193,8 +193,22 @@ con su lectura y su traducción al español.
 
 Los niveles salen de las listas de Jonathan Waller —la misma procedencia que
 las de kanji, así que ambos temarios encajan— y las traducciones de JMdict,
-porque esas listas vienen en inglés. Se conserva el 80 % de las palabras: las
+porque esas listas vienen en inglés. Se conserva el 84 % de las palabras: las
 que JMdict no traduce al español se descartan antes que mostrar inglés.
+
+Cada palabra lleva su **categoría gramatical**, y no es un adorno: 青 y 青い
+son ambas «azul», sustantivo la primera y adjetivo la segunda. En N5 hay 33
+significados compartidos por 69 palabras distintas, y en N1 son 220 por 488;
+sin la categoría no habría forma de distinguirlas.
+
+Cuando JMdict mezcla lecturas en una misma entrada —開く es あく intransitivo
+y ひらく transitivo— no se afirma la transitividad: vale más callar que
+enseñar lo contrario.
+
+También se muestran las **otras acepciones**, pero solo como información: no
+se aceptan como respuesta. JMdict agrupa palabras que comparten entrada, así
+que entre las acepciones de 会う aparecen las de 遭う, y dar «tener un
+accidente» por buena para 会う sería enseñar algo falso.
 
 **No espera a los kanji que contiene**, y es deliberado: los libros enseñan
 vocabulario y kanji a la vez, y la lección presenta cada palabra con su

@@ -144,6 +144,8 @@ export interface ManabiApi {
   getSetting(key: string): Promise<string | null>
   setSetting(key: string, value: string): Promise<void>
   newPerDay(): Promise<number>
+  newPerDayTotal(): Promise<number>
+  setNewPerDayTotal(v: number): Promise<number>
   setNewPerDay(value: number): Promise<number>
   overview(): Promise<Overview>
   resetProgress(): Promise<void>

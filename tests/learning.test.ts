@@ -28,6 +28,7 @@ import {
   suspendCard,
   componentsOf,
   wordsForKanji,
+  kanjiReadings,
   retention,
   setRetention,
 } from '../electron/db'
@@ -228,6 +229,19 @@ describe('palabras de ejemplo de un kanji', () => {
       const all = kanjiWords.filter((w) => w.k === glyph)
       if (all.length) expect(wordsForKanji(glyph).length).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('lecturas de un kanji suelto', () => {
+  it('las sirve para el texto pulsable de las frases', () => {
+    // En una frase no se sabe qué lectura toca —日 es ニチ en 日本 y ひ en
+    // ひどい日—, así que se dan todas, como en un diccionario.
+    expect(kanjiReadings('日')).toMatchObject({ on: ['ニチ', 'ジツ'] })
+    expect(kanjiReadings('日')!.meanings[0]).toBe('día')
+  })
+
+  it('no inventa nada para lo que no está en el temario', () => {
+    expect(kanjiReadings('あ')).toBeNull()
   })
 })
 

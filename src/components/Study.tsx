@@ -3,6 +3,7 @@ import type { StudyCard } from '../types'
 import { checkAnswer, maskAnswer, toTargetKana, type CheckMode } from '../lib/answer'
 import { cleanReading, spokenForm } from '../lib/speech'
 import Speaker from './Speaker'
+import JapaneseText from './JapaneseText'
 import StrokeOrder from './StrokeOrder'
 import Components from './Components'
 import Handwriting, { guideFor, type GuideLevel } from './Handwriting'
@@ -953,7 +954,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
               <ul className="mt-4 space-y-2">
                 {prompt.grammar.examples.map((e) => (
                   <li key={e.jp} className="text-sm">
-                    <span className="jp text-base">{e.jp}</span>
+                    <JapaneseText text={e.jp} className="jp text-base" />
                     <Speaker text={e.jp} />
                     <span className="ml-1 text-muted">{e.es}</span>
                   </li>

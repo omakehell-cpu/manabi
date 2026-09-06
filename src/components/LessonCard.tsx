@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { StudyCard } from '../types'
 import { cleanReading, spokenForm } from '../lib/speech'
 import Speaker from './Speaker'
+import JapaneseText from './JapaneseText'
 import StrokeOrder from './StrokeOrder'
 import Handwriting from './Handwriting'
 import { FORMS } from '../lib/conjugation'
@@ -116,7 +117,7 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
           <ul className="mt-4 w-full space-y-2 text-left">
             {gram.examples.map((e) => (
               <li key={e.jp} className="rounded-lg bg-surface px-4 py-2.5 text-sm">
-                <span className="jp text-base">{e.jp}</span>
+                <JapaneseText text={e.jp} className="jp text-base" />
                 <Speaker text={e.jp} />
                 <p className="mt-0.5 text-muted">{e.es}</p>
               </li>
@@ -272,7 +273,10 @@ export function ExampleSentence({
   return (
     <div className="mt-6 w-full max-w-lg rounded-xl border border-line bg-surface px-5 py-4">
       <div className="flex items-start gap-2">
-        <p className="jp flex-1 text-lg leading-relaxed">{sentence.japanese}</p>
+        <JapaneseText
+          text={sentence.japanese}
+          className="jp flex-1 text-lg leading-relaxed"
+        />
         <Speaker text={sentence.japanese} size="md" />
       </div>
       <p className="mt-2 text-sm text-muted">{sentence.spanish}</p>

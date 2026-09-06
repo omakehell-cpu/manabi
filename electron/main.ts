@@ -36,6 +36,7 @@ import {
   lessonBatchSize,
   setLessonBatchSize,
   wordsForKanji,
+  kanjiReadings,
   getSetting,
   setSetting,
   retention,
@@ -165,6 +166,7 @@ app.whenReady().then(() => {
     return lessonBatchSize()
   })
   ipcMain.handle('kanji:words', (_e, glyph: string) => wordsForKanji(glyph))
+  ipcMain.handle('kanji:readings', (_e, glyph: string) => kanjiReadings(glyph))
   ipcMain.handle('kanji:sentence', (_e, glyph: string) => sentenceFor(glyph))
   ipcMain.handle('kanji:components', (_e, glyph: string) => componentsOf(glyph))
   ipcMain.handle('settings:retention', () => retention())

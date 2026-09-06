@@ -1726,6 +1726,17 @@ const READINGS = new Map<string, Readings>(
 )
 const readingsOf = (k: string) => READINGS.get(k)
 
+/** Los datos de diccionario de un kanji suelto, sin tocar la base. */
+export function kanjiReadings(
+  glyph: string,
+): { on: string[]; kun: string[]; meanings: string[] } | null {
+  const entry = (KANJI as { k: string; on?: string[]; kun?: string[]; m?: string[] }[]).find(
+    (k) => k.k === glyph,
+  )
+  if (!entry) return null
+  return { on: entry.on ?? [], kun: entry.kun ?? [], meanings: entry.m ?? [] }
+}
+
 export interface ExampleWord {
   word: string
   reading: string

@@ -33,6 +33,7 @@ const api = {
   lessonBatch: () => ipcRenderer.invoke('settings:lessonBatch'),
   setLessonBatch: (v: number) => ipcRenderer.invoke('settings:setLessonBatch', v),
   wordsForKanji: (glyph: string) => ipcRenderer.invoke('kanji:words', glyph),
+  kanjiReadings: (glyph: string) => ipcRenderer.invoke('kanji:readings', glyph),
   sentenceFor: (glyph: string) => ipcRenderer.invoke('kanji:sentence', glyph),
   componentsOf: (glyph: string) => ipcRenderer.invoke('kanji:components', glyph),
   retention: () => ipcRenderer.invoke('settings:retention'),

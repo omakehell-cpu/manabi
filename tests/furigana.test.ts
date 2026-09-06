@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { baseReading, segment, type Readings } from '../src/lib/furigana'
+import { baseReading, isKanjiChar, segment, type Readings } from '../src/lib/furigana'
 import KANJI from '../src/data/kanji.json'
 import { readFileSync } from 'node:fs'
 
@@ -71,5 +71,13 @@ describe('cobertura sobre el temario', () => {
     const ok = words.filter((w) => segment(w.w, w.r, readingsOf)).length
     // El resto son jukujikun de verdad, que no admiten reparto.
     expect(ok / words.length).toBeGreaterThan(0.97)
+  })
+})
+
+describe('qué carácter hay que leer', () => {
+  it('distingue los kanji del kana y de la puntuación', () => {
+    expect([...'一日中グダグダしてた。'].filter(isKanjiChar).join('')).toBe('一日中')
+    expect([...'ねこがいます'].filter(isKanjiChar)).toHaveLength(0)
+    expect(isKanjiChar('々')).toBe(false)
   })
 })

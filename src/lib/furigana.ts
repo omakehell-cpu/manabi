@@ -59,6 +59,14 @@ function isKana(c: string): boolean {
   return /[぀-ヿㇰ-ㇿ]/.test(c)
 }
 
+/**
+ * Un carácter que hay que leer para saber cómo suena. Deja fuera el kana,
+ * la puntuación japonesa (。、「」), el signo de repetición 々 y lo latino.
+ */
+export function isKanjiChar(c: string): boolean {
+  return /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(c)
+}
+
 interface Candidate {
   reading: string
   source: string

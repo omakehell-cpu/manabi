@@ -187,6 +187,9 @@ export interface ManabiApi {
   lessonBatch(): Promise<number>
   setLessonBatch(v: number): Promise<number>
   wordsForKanji(glyph: string): Promise<ExampleWord[]>
+  kanjiReadings(
+    glyph: string,
+  ): Promise<{ on: string[]; kun: string[]; meanings: string[] } | null>
   sentenceFor(glyph: string): Promise<{ japanese: string; spanish: string } | null>
   componentsOf(glyph: string): Promise<KanjiComponent[]>
   retention(): Promise<number>

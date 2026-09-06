@@ -510,6 +510,38 @@ bastante mejores para descargar en Ajustes del Sistema → Accesibilidad →
 Contenido hablado → Voz del sistema → Gestionar voces → Japonés; al
 instalarlas aparecen solas en la lista y la puntuación las prefiere.
 
+## Tapar la furigana
+
+Teniendo la lectura delante se lee la lectura, no el kanji: se acaba
+reconociendo ちゅう y creyendo que se reconoce 中. **Progreso → Furigana**
+tiene dos modos:
+
+| | |
+|---|---|
+| **Siempre visible** | la lectura va encima de cada carácter |
+| **Al pulsar el kanji** | los kanji salen resaltados y se descubren uno a uno |
+
+En el segundo modo cada kanji es una pregunta y pulsarlo es la respuesta. Se
+descubre carácter a carácter, no la palabra entera: en 中国人 se puede
+comprobar 中 y seguir dudando de 人. El hueco de la furigana se reserva
+aunque esté tapada, para que descubrirla no mueva la línea de sitio. Cada
+palabra empieza tapada de nuevo.
+
+Las palabras que no admiten reparto —大人 おとな— no tienen nada que pulsar
+carácter a carácter, así que se tapa la lectura entera tras un botón.
+
+### En las frases no se sabe cuál es
+
+El modo se extiende a las frases de ejemplo y a los ejemplos de gramática,
+pero con una diferencia que importa: **ahí no se sabe qué lectura toca**. 日
+es ニチ en 日本 y ひ en ひどい日, y una frase de Tatoeba no trae su lectura
+ni hay análisis gramatical que la deduzca.
+
+Así que al pulsar un kanji en una frase no se muestra «la» lectura, sino las
+del carácter, como en un diccionario: ON, KUN y significados, cada una con
+su audio. Fingir que sabemos cuál suena sería enseñar una lectura
+equivocada la mitad de las veces.
+
 ### Qué se reproduce
 
 Dándole kanji, el motor elige la lectura por su cuenta, y no siempre la que

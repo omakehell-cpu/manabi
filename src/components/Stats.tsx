@@ -11,7 +11,14 @@ import {
   setSpeechRate,
 } from '../lib/speech'
 import { useVoicesReady } from './Speaker'
-import { setStrokeVisibility, strokeVisibility, type StrokeMode } from '../lib/prefs'
+import {
+  setFuriganaMode,
+  setStrokeVisibility,
+  strokeVisibility,
+  useFuriganaMode,
+  type FuriganaMode,
+  type StrokeMode,
+} from '../lib/prefs'
 import Forecast from './Forecast'
 import Leeches from './Leeches'
 
@@ -181,6 +188,7 @@ function StudySettings() {
       <RetentionSetting />
 
       <StrokeSetting />
+      <FuriganaSetting />
     </>
   )
 }
@@ -302,6 +310,37 @@ function TotalCap() {
       />
       <span className="text-sm tabular-nums text-muted">
         {value === 0 ? 'ninguna' : `${value} al día`}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * La furigana delante se lee sola: se acaba reconociendo la lectura y no el
+ * carácter. Taparla convierte cada kanji en una pregunta, y pulsarlo en la
+ * respuesta.
+ */
+function FuriganaSetting() {
+  const mode = useFuriganaMode()
+
+  return (
+    <div className="mt-6 flex flex-wrap items-center gap-3">
+      <label htmlFor="furigana" className="w-24 text-sm text-muted">
+        Furigana
+      </label>
+      <select
+        id="furigana"
+        value={mode}
+        onChange={(e) => void setFuriganaMode(e.target.value as FuriganaMode)}
+        className="rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-muted"
+      >
+        <option value="always">Siempre visible</option>
+        <option value="tap">Al pulsar el kanji</option>
+      </select>
+      <span className="text-sm text-muted">
+        {mode === 'tap'
+          ? 'los kanji salen resaltados y se descubren uno a uno'
+          : 'la lectura va encima de cada carácter'}
       </span>
     </div>
   )

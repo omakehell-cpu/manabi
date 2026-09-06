@@ -1,8 +1,41 @@
 # Manabi
 
 Flipcards de japonés para Windows, macOS y Linux, con repetición espaciada
-FSRS.
-Funciona sin conexión: todo el progreso vive en una base SQLite local.
+FSRS. Funciona sin conexión: todo el progreso vive en una base SQLite local.
+
+## Descargar
+
+**[⬇ Última versión](https://github.com/omakehell-cpu/manabi/releases/latest)**
+
+| Sistema | Fichero |
+|---|---|
+| macOS, Apple Silicon (M1 y posteriores) | `Manabi-<versión>-arm64.dmg` |
+| macOS, Intel | `Manabi-<versión>.dmg` |
+| Windows 10/11, 64 bits | `Manabi.Setup.<versión>.exe` |
+| Linux, cualquier distribución | `Manabi-<versión>.AppImage` |
+| Linux, Debian y Ubuntu | `manabi_<versión>_amd64.deb` |
+
+### La primera vez avisa
+
+Los binarios **no están firmados con un certificado de desarrollador** —eso
+cuesta una cuenta de Apple Developer y un certificado de Windows, y este
+proyecto no los tiene—, así que los tres sistemas se quejan al abrirlos. No
+es que la descarga venga rota:
+
+- **macOS** — clic derecho sobre la app → **Abrir** → confirmar. Solo la
+  primera vez. Si aun así se niega:
+  `xattr -dr com.apple.quarantine /Applications/Manabi.app`
+- **Windows** — SmartScreen dice «Windows protegió su PC»: **Más
+  información** → **Ejecutar de todas formas**.
+- **Linux** — el AppImage necesita permiso de ejecución:
+  `chmod +x Manabi-*.AppImage && ./Manabi-*.AppImage`
+
+Cada release lleva un `SHA256SUMS.txt` para comprobar la descarga.
+
+¿Prefieres compilarlo tú? Los tres instaladores se generan desde cualquiera
+de los tres sistemas: ver [Desarrollo](#desarrollo).
+
+---
 
 ## Modos
 
@@ -571,9 +604,14 @@ npm run dev          # app en modo desarrollo
 npm run test         # comprueba la lógica sin abrir la interfaz
 npm run test:watch   # lo mismo, en vigilancia
 npm run build        # compila renderer + procesos de Electron
-npm run dist:mac     # DMG (arm64 y x64) en release/
+npm run dist:mac     # DMG arm64 y x64 en release/
 npm run dist:win     # instalador NSIS en release/
+npm run dist:linux   # AppImage y .deb en release/
 ```
+
+Los tres se generan desde cualquier sistema sin compilar nada ni levantar un
+contenedor: el binario nativo de `better-sqlite3` viene precompilado para
+las ocho plataformas dentro del propio paquete.
 
 ### Regenerar los datos de kanji
 

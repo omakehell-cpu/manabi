@@ -151,6 +151,18 @@ function buildPrompt(card: StudyCard): Prompt {
  */
 type Phase = 'asking' | 'retry' | 'right' | 'wrong'
 
+/** «10 min», «3 d», «2 mes»: cuándo volvería la carta con cada nota. */
+function formatInterval(minutes: number | undefined): string {
+  if (!minutes) return ''
+  if (minutes < 60) return `${minutes} min`
+  const hours = minutes / 60
+  if (hours < 24) return `${Math.round(hours)} h`
+  const days = hours / 24
+  if (days < 31) return `${Math.round(days)} d`
+  const months = days / 30.4
+  return months < 12 ? `${Math.round(months)} mes` : `${(months / 12).toFixed(1)} a`
+}
+
 
 
 interface Props {
@@ -177,6 +189,16 @@ export default function Study({ deck, deckName, onExit }: Props) {
   const [justSuspended, setJustSuspended] = useState(false)
   /** Lo tecleado en el intento fallido, para poder enseñárselo al corregir. */
   const [firstTry, setFirstTry] = useState('')
+  /** Cuándo volvería la carta con cada nota, en minutos. */
+  const [preview, setPreview] = useState<Record<number, number>>({})
+  /** Nota que se aplica al pulsar Intro tras acertar. */
+  const [defaultRating, setDefaultRating] = useState<2 | 3>(3)
+  /**
+   * Si hay algo que deshacer. Se consulta a la base de datos y no al
+   * contador de la sesión, porque deshacer sobrevive a cerrar la aplicación:
+   * al entrar puede haber un repaso de ayer pendiente de retirar.
+   */
+  const [undoable, setUndoable] = useState(false)
   /** Tanda que se está presentando; vacía mientras se examina. */
   const [lesson, setLesson] = useState<StudyCard[]>([])
   const [lessonAt, setLessonAt] = useState(0)
@@ -193,9 +215,12 @@ export default function Study({ deck, deckName, onExit }: Props) {
   const [exhausted, setExhausted] = useState<Exhausted | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const shownAt = useRef(Date.now())
+  /** `advance` se define después de `setAside`; la referencia rompe el ciclo. */
+  const advanceRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     void strokeVisibility().then(setStrokeMode)
+    void window.manabi.canUndo().then(setUndoable)
   }, [])
 
   /** Abre la siguiente tanda de lecciones; devuelve false si no queda ninguna. */
@@ -305,11 +330,20 @@ export default function Study({ deck, deckName, onExit }: Props) {
     shownAt.current = Date.now()
   }, [lesson, lessonAt])
 
+  /** Aparta la carta actual: para lo que estorba y no se quiere arrastrar. */
+  const setAside = useCallback(async () => {
+    if (!card) return
+    await window.manabi.suspendCard(card.cardId)
+    advanceRef.current?.()
+  }, [card])
+
   const advance = useCallback(() => {
     setPhase('asking')
     setValue('')
     setFirstTry('')
     setJustSuspended(false)
+    setPreview({})
+    setDefaultRating(3)
     setDone((d) => d + 1)
 
     if (batch) {
@@ -335,6 +369,8 @@ export default function Study({ deck, deckName, onExit }: Props) {
     inputRef.current?.focus()
   }, [queue, index, refill, batch, phase, openLessons])
 
+  advanceRef.current = advance
+
   const submit = useCallback(async () => {
     if (!card || !prompt || !value.trim()) return
     if (phase !== 'asking' && phase !== 'retry') return
@@ -344,13 +380,16 @@ export default function Study({ deck, deckName, onExit }: Props) {
     const second = phase === 'retry'
 
     if (result.correct) {
-      setPhase('right')
       setTally((t) => ({ ...t, right: t.right + 1 }))
+      // Acertar no califica todavía: primero se enseña cuándo volvería la
+      // carta con cada nota, y se registra al elegir. Calificar aquí y
+      // recalificar después dejaba DOS repasos en el historial por una sola
+      // respuesta, y FSRS aplicaba las dos programaciones en cascada.
+      setPreview(await window.manabi.previewIntervals(card.cardId))
       // Acertar al segundo intento no es lo mismo que acertar a la primera:
-      // se registra como «costó», que es lo que de verdad ha pasado.
-      const rating = second ? 2 : 3
-      history.current.push(rating)
-      await window.manabi.grade(card.cardId, rating, elapsed)
+      // la nota por defecto pasa a ser «costó», que es lo que ha pasado.
+      setDefaultRating(second ? 2 : 3)
+      setPhase('right')
       return
     }
 
@@ -366,19 +405,19 @@ export default function Study({ deck, deckName, onExit }: Props) {
     setTally((t) => ({ ...t, wrong: t.wrong + 1 }))
     history.current.push(1)
     const outcome = await window.manabi.grade(card.cardId, 1, elapsed)
+    setUndoable(true)
     // Apartarla en silencio dejaba al usuario sin saber que había dejado
     // de ver algo; se avisa aquí y queda listada en Progreso.
     setJustSuspended(outcome.suspended)
   }, [card, prompt, phase, value])
 
-  /** Recalifica un acierto con una nota distinta (Difícil / Fácil). */
-  const regrade = useCallback(
-    async (rating: 2 | 4) => {
+  /** Registra la nota elegida —una sola vez— y pasa a la siguiente carta. */
+  const commit = useCallback(
+    async (rating: 2 | 3 | 4) => {
       if (!card || phase !== 'right') return
-      // Recalificar sustituye la nota anterior, así que se registran las dos:
-      // deshacer tendrá que retirarlas una a una, igual que se dieron.
       history.current.push(rating)
       await window.manabi.grade(card.cardId, rating, Date.now() - shownAt.current)
+      setUndoable(true)
       advance()
     },
     [card, phase, advance],
@@ -392,7 +431,8 @@ export default function Study({ deck, deckName, onExit }: Props) {
    */
   const undo = useCallback(async () => {
     const undone = await window.manabi.undo()
-    if (!undone) return
+    if (!undone) return setUndoable(false)
+    void window.manabi.canUndo().then(setUndoable)
 
     const rating = history.current.pop()
     if (rating !== undefined) {
@@ -431,16 +471,19 @@ export default function Study({ deck, deckName, onExit }: Props) {
       if (e.key === 'Enter') {
         e.preventDefault()
         if (lesson.length) return void advanceLesson()
-        return phase === 'asking' || phase === 'retry' ? void submit() : advance()
+        if (phase === 'asking' || phase === 'retry') return void submit()
+        if (phase === 'right') return void commit(defaultRating)
+        return advance()
       }
       if (phase === 'right') {
-        if (e.key === '2') return void regrade(2)
-        if (e.key === '4') return void regrade(4)
+        if (e.key === '2') return void commit(2)
+        if (e.key === '3') return void commit(3)
+        if (e.key === '4') return void commit(4)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [phase, submit, advance, regrade, onExit, undo, lesson, advanceLesson])
+  }, [phase, submit, advance, commit, defaultRating, onExit, undo, lesson, advanceLesson])
 
   // Las dependencias son todo lo que puede hacer aparecer el input o cambiar
   // de carta: la cola que llega tarde, el avance dentro de ella, y el lote
@@ -516,7 +559,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
           />
         </div>
 
-        {done > 0 && (
+        {undoable && (
           <button
             onClick={() => void undo()}
             className="mt-6 text-sm text-muted underline underline-offset-4 hover:text-fg"
@@ -568,7 +611,14 @@ export default function Study({ deck, deckName, onExit }: Props) {
           </button>
         </div>
         <div className="no-drag flex items-center gap-4">
-          {done > 0 && (
+          <button
+            onClick={() => void setAside()}
+            title="Apartar esta carta; queda en Progreso para devolverla"
+            className="rounded-md px-2 py-1 text-sm text-muted transition-colors hover:bg-raised hover:text-fg"
+          >
+            Apartar
+          </button>
+          {undoable && (
             <button
               onClick={() => void undo()}
               title="Deshacer el último repaso (⌘Z)"
@@ -740,9 +790,23 @@ export default function Study({ deck, deckName, onExit }: Props) {
             )}
             {phase === 'right' && (
               <>
-                <Key onClick={() => void regrade(2)} label="Costó" hint="2" />
-                <Key onClick={advance} label="Bien" hint="Intro" primary />
-                <Key onClick={() => void regrade(4)} label="Fácil" hint="4" />
+                <Key
+                  onClick={() => void commit(2)}
+                  label="Costó"
+                  hint={formatInterval(preview[2])}
+                  primary={defaultRating === 2}
+                />
+                <Key
+                  onClick={() => void commit(3)}
+                  label="Bien"
+                  hint={formatInterval(preview[3])}
+                  primary={defaultRating === 3}
+                />
+                <Key
+                  onClick={() => void commit(4)}
+                  label="Fácil"
+                  hint={formatInterval(preview[4])}
+                />
               </>
             )}
             {phase === 'wrong' && <Key onClick={advance} label="Continuar" hint="Intro" primary />}

@@ -69,7 +69,31 @@ const DEFAULT_LESSON_BATCH = 5
 
 const BLOCK_ORDER = ['gojuon', 'dakuten', 'yoon', 'extended'] as const
 
-const scheduler = fsrs(generatorParameters({ enable_fuzz: true }))
+/**
+ * Retención objetivo: la probabilidad de acordarse cuando una carta vuelve.
+ *
+ * Es la palanca directa sobre cuánto trabajo diario hay. FSRS usa 0,9 por
+ * defecto; bajarla a 0,85 reduce bastante los repasos a cambio de olvidar
+ * algo más a menudo.
+ */
+const DEFAULT_RETENTION = 0.9
+
+function scheduler() {
+  return fsrs(
+    generatorParameters({
+      enable_fuzz: true,
+      request_retention: numericSetting('retention', DEFAULT_RETENTION, 0.7, 0.97),
+    }),
+  )
+}
+
+export function retention(): number {
+  return numericSetting('retention', DEFAULT_RETENTION, 0.7, 0.97)
+}
+
+export function setRetention(value: number): void {
+  setSetting('retention', String(Math.max(0.7, Math.min(0.97, value))))
+}
 
 let db: Database.Database
 
@@ -617,7 +641,7 @@ export function gradeCard(cardId: number, rating: Grade, durationMs: number): Gr
 
   const now = new Date()
   const stateBefore = row.state as number
-  const next = scheduler.next(rowToFsrs(row), now, rating).card
+  const next = scheduler().next(rowToFsrs(row), now, rating).card
 
   db.transaction(() => {
     db.prepare(
@@ -671,14 +695,24 @@ export function gradeCard(cardId: number, rating: Grade, durationMs: number): Gr
   }
 }
 
-/** Intervalos que produciría cada nota, para pintarlos en los botones. */
+/**
+ * Minutos que tardaría en volver la carta con cada nota, para poder
+ * enseñarlo en los botones. No modifica nada: FSRS calcula sobre una copia.
+ *
+ * Se devuelve en minutos y no en días porque las cartas en aprendizaje
+ * vuelven en 1 o 10 minutos, y ahí «0 días» no dice nada.
+ */
 export function previewIntervals(cardId: number): Record<number, number> {
-  const row = db.prepare('SELECT * FROM card WHERE id = ?').get(cardId) as Record<string, unknown>
+  const row = db.prepare('SELECT * FROM card WHERE id = ?').get(cardId) as
+    | Record<string, unknown>
+    | undefined
+  if (!row) return {}
   const card = rowToFsrs(row)
   const now = new Date()
   const out: Record<number, number> = {}
   for (const g of [1, 2, 3, 4] as Grade[]) {
-    out[g] = scheduler.next(card, now, g).card.scheduled_days
+    const due = scheduler().next(card, now, g).card.due
+    out[g] = Math.max(1, Math.round((due.getTime() - now.getTime()) / 60_000))
   }
   return out
 }

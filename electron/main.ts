@@ -27,12 +27,13 @@ import {
   getCard,
   getLessons,
   markPresented,
-  lessonsRemaining,
   lessonBatchSize,
   setLessonBatchSize,
   wordsForKanji,
   getSetting,
   setSetting,
+  retention,
+  setRetention,
   type BrowseFilters,
 } from './db'
 
@@ -87,13 +88,17 @@ app.whenReady().then(() => {
   ipcMain.handle('card:get', (_e, cardId: number) => getCard(cardId))
   ipcMain.handle('lessons:get', (_e, slug: string, limit?: number) => getLessons(slug, limit))
   ipcMain.handle('lessons:present', (_e, ids: number[]) => markPresented(ids))
-  ipcMain.handle('lessons:remaining', (_e, slug: string) => lessonsRemaining(slug))
   ipcMain.handle('settings:lessonBatch', () => lessonBatchSize())
   ipcMain.handle('settings:setLessonBatch', (_e, v: number) => {
     setLessonBatchSize(v)
     return lessonBatchSize()
   })
   ipcMain.handle('kanji:words', (_e, glyph: string) => wordsForKanji(glyph))
+  ipcMain.handle('settings:retention', () => retention())
+  ipcMain.handle('settings:setRetention', (_e, v: number) => {
+    setRetention(v)
+    return retention()
+  })
   ipcMain.handle('settings:get', (_e, key: string) => getSetting(key))
   ipcMain.handle('settings:set', (_e, key: string, value: string) => setSetting(key, value))
   ipcMain.handle('settings:newPerDay', () => newPerDay())

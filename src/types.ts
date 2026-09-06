@@ -124,10 +124,11 @@ export interface ManabiApi {
   getCard(cardId: number): Promise<StudyCard | null>
   getLessons(slug: string, limit?: number): Promise<StudyCard[]>
   markPresented(ids: number[]): Promise<void>
-  lessonsRemaining(slug: string): Promise<number>
   lessonBatch(): Promise<number>
   setLessonBatch(v: number): Promise<number>
   wordsForKanji(glyph: string): Promise<{ word: string; reading: string; meaning: string }[]>
+  retention(): Promise<number>
+  setRetention(v: number): Promise<number>
   getSetting(key: string): Promise<string | null>
   setSetting(key: string, value: string): Promise<void>
   newPerDay(): Promise<number>

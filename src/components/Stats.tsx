@@ -173,6 +173,8 @@ function StudySettings() {
         los 104 hiragana llevan poco más de una semana.
       </p>
 
+      <RetentionSetting />
+
       <StrokeSetting />
     </>
   )
@@ -215,6 +217,52 @@ function LessonBatch() {
         {value} {value === 1 ? 'elemento' : 'elementos'}
       </span>
     </div>
+  )
+}
+
+/**
+ * Retención objetivo: con qué probabilidad quieres acordarte cuando una
+ * carta vuelve. Es la palanca directa sobre el trabajo diario, así que se
+ * explica en esos términos y no en los del algoritmo.
+ */
+function RetentionSetting() {
+  const [value, setValue] = useState<number | null>(null)
+
+  useEffect(() => {
+    void window.manabi.retention().then(setValue)
+  }, [])
+
+  if (value === null) return null
+
+  return (
+    <>
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <label htmlFor="ret" className="w-24 text-sm text-muted">
+          Retención
+        </label>
+        <input
+          id="ret"
+          type="range"
+          min={0.8}
+          max={0.95}
+          step={0.01}
+          value={value}
+          onChange={(e) => {
+            const v = Number(e.target.value)
+            setValue(v)
+            void window.manabi.setRetention(v)
+          }}
+          className="w-48 accent-[var(--color-accent)]"
+        />
+        <span className="text-sm tabular-nums text-muted">{Math.round(value * 100)} %</span>
+      </div>
+      <p className="mt-3 max-w-xl text-xs leading-relaxed text-muted">
+        Con qué probabilidad quieres acordarte de algo cuando vuelve a
+        preguntártelo. Subirla implica repasar más a menudo; bajarla, menos
+        repasos a cambio de olvidar más. Afecta solo a lo que se programe a
+        partir de ahora.
+      </p>
+    </>
   )
 }
 

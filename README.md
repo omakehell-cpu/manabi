@@ -100,6 +100,17 @@ contraída. Y durante el examen, una carta recién presentada se marca como
 **nueva**, porque ante algo que acabas de ver no tiene sentido exigirte lo
 mismo que ante un repaso de hace una semana.
 
+## Cuándo vuelve cada carta
+
+Al acertar, los botones enseñan cuándo volvería la carta con cada nota
+—«Costó 6 min», «Bien 10 min», «Fácil 9 d»—, calculado sobre una copia sin
+tocar nada.
+
+La nota se registra **una sola vez, al elegirla**. Antes se calificaba al
+responder y otra vez al pulsar el botón, así que una única respuesta dejaba
+dos repasos en el historial y FSRS aplicaba las dos programaciones en
+cascada.
+
 ## Un reintento por carta
 
 Fallar una vez no da la carta por fallada. El primer error no se califica ni
@@ -202,6 +213,16 @@ Solo cuenta lo ya programado. Las cartas nuevas sin estudiar no aparecen,
 porque su fecha depende de cuándo las veas y con qué nota: es una previsión
 de lo comprometido, no una estimación.
 
+## Retención objetivo
+
+En Progreso se ajusta con qué probabilidad quieres acordarte de algo cuando
+vuelve a preguntártelo. Es la palanca directa sobre el trabajo diario:
+subirla implica repasar más a menudo; bajarla, menos repasos a cambio de
+olvidar más. FSRS usa 0,9 por defecto.
+
+Solo afecta a las cartas ya asentadas: los pasos de aprendizaje (1 y 10
+minutos) son fijos.
+
 ## Pronunciación
 
 Los botones de audio usan las voces japonesas instaladas en el sistema
@@ -230,7 +251,8 @@ eso el audio va en cada lectura por separado, y en las palabras completas.
 ```bash
 npm install          # instala dependencias
 npm run dev          # app en modo desarrollo
-npm run check        # verifica la lógica de datos sin abrir la interfaz
+npm run test         # comprueba la lógica sin abrir la interfaz
+npm run test:watch   # lo mismo, en vigilancia
 npm run build        # compila renderer + procesos de Electron
 npm run dist:mac     # DMG (arm64 y x64) en release/
 npm run dist:win     # instalador NSIS en release/
@@ -257,8 +279,11 @@ node --max-old-space-size=4096 --experimental-strip-types scripts/build-kanji-wo
 node --max-old-space-size=4096 --experimental-strip-types scripts/build-kanjivg.ts <fuentes>
 ```
 
-`npm run check` es la red de seguridad: comprueba la siembra, la
-programación FSRS y las tres reglas de desbloqueo sin abrir Electron.
+`npm run test` es la red de seguridad: 53 pruebas con Vitest que cubren la
+siembra, la programación de FSRS, las seis reglas de desbloqueo, las
+lecciones, el cupo diario, las cartas apartadas, el explorador, el trazado y
+deshacer, todo sin abrir Electron. Ha cazado varios fallos que la interfaz
+no delataba.
 
 ### Notas de empaquetado
 

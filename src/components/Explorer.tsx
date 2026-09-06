@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toHiragana, toKatakana } from 'wanakana'
 import type { KanjiBrowseItem, KanjiDetail, KanjiProgress, SimpleBrowseItem } from '../types'
-import { cleanReading } from '../lib/speech'
+import { cleanReading, spokenForm } from '../lib/speech'
 import Speaker from './Speaker'
 import Furigana from './Furigana'
 import StrokeOrder from './StrokeOrder'
@@ -230,7 +230,7 @@ export default function Explorer() {
               {k.meaning && (
                 <span className="ml-auto truncate text-right text-sm text-muted">{k.meaning}</span>
               )}
-              <Speaker text={k.glyph} />
+              <Speaker text={spokenForm(k.glyph, k.reading)} label={k.glyph} />
             </li>
           ))}
         </ul>
@@ -337,7 +337,7 @@ function DetailPanel({ detail, onClose }: { detail: KanjiDetail; onClose: () => 
             {detail.words.map((w) => (
               <li key={w.word} className="flex items-baseline gap-3 text-sm">
                 <Furigana word={w.word} reading={w.reading} parts={w.parts} focus={detail.glyph} />
-                <Speaker text={w.word} />
+                <Speaker text={spokenForm(w.word, w.reading)} label={w.word} />
                 <span className="ml-auto text-right text-muted">{w.meaning}</span>
               </li>
             ))}

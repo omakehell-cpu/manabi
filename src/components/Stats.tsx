@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { Overview } from '../types'
 import {
-  japaneseVoices,
+  rankedVoices,
+  isRecommended,
+  voiceLabel,
   preferredVoice,
   setPreferredVoice,
   speak,
@@ -353,7 +355,9 @@ function StrokeSetting() {
  */
 function VoiceSettings() {
   const ready = useVoicesReady()
-  const voices = japaneseVoices()
+  const voices = rankedVoices()
+  const good = voices.filter(isRecommended)
+  const rest = voices.filter((v) => !isRecommended(v))
   const [voice, setVoice] = useState(() => preferredVoice()?.name ?? '')
   const [rate, setRate] = useState(speechRate)
 
@@ -382,19 +386,42 @@ function VoiceSettings() {
               }}
               className="rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-muted"
             >
-              {voices.map((v) => (
-                <option key={v.name} value={v.name}>
-                  {v.name}
-                </option>
-              ))}
+              {/* Separadas porque macOS mete ocho voces de broma en la lista
+                  de japonés, y por nombre no hay manera de saber cuál es la
+                  buena: Eddy y Kyoko se parecen lo mismo. */}
+              <optgroup label="Voces japonesas">
+                {good.map((v) => (
+                  <option key={v.name} value={v.name}>
+                    {voiceLabel(v)}
+                  </option>
+                ))}
+              </optgroup>
+              {rest.length > 0 && (
+                <optgroup label="Voces de broma del sistema">
+                  {rest.map((v) => (
+                    <option key={v.name} value={v.name}>
+                      {voiceLabel(v)}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
             <button
-              onClick={() => speak('こんにちは')}
+              onClick={() => speak('日本語の勉強を始めましょう')}
               className="rounded-lg bg-raised px-4 py-2 text-sm hover:bg-line"
             >
               Probar
             </button>
           </div>
+
+          <p className="max-w-xl text-sm leading-relaxed text-muted">
+            Las voces que trae el sistema de serie son las comprimidas. En macOS hay
+            versiones mucho mejores para descargar en Ajustes del Sistema → Accesibilidad
+            → Contenido hablado → Voz del sistema → Gestionar voces → Japonés, donde
+            Kyoko y Otoya aparecen en calidad mejorada y premium. En Windows, las voces
+            naturales se añaden en Configuración → Hora e idioma → Voz. Al instalarlas
+            salen solas en esta lista.
+          </p>
 
           <div className="flex flex-wrap items-center gap-3">
             <label htmlFor="vel" className="w-24 text-sm text-muted">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { StudyCard } from '../types'
-import { cleanReading } from '../lib/speech'
+import { cleanReading, spokenForm } from '../lib/speech'
 import Speaker from './Speaker'
 import StrokeOrder from './StrokeOrder'
 import Handwriting from './Handwriting'
@@ -133,7 +133,7 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
           </p>
           <div className="flex items-center gap-2">
             <p className="jp text-4xl text-warn">{conj.answer}</p>
-            <Speaker text={conj.answer} size="md" />
+            <Speaker text={spokenForm(conj.answer, conj.answerKana)} label={conj.answer} size="md" />
           </div>
           {conj.answerKana !== conj.answer && (
             <p className="jp text-lg text-muted">{conj.answerKana}</p>
@@ -184,7 +184,7 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
               >
                 {card.reading}
               </p>
-              <Speaker text={card.glyph} size="md" />
+              <Speaker text={spokenForm(card.glyph, card.reading)} label={card.glyph} size="md" />
             </div>
           )}
 
@@ -242,7 +242,7 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
                 className="flex items-baseline gap-3 rounded-lg bg-surface px-4 py-2 text-sm"
               >
                 <Furigana word={w.word} reading={w.reading} parts={w.parts} focus={card.glyph} />
-                <Speaker text={w.word} />
+                <Speaker text={spokenForm(w.word, w.reading)} label={w.word} />
                 <span className="ml-auto text-right text-muted">{w.meaning}</span>
               </li>
             ))}

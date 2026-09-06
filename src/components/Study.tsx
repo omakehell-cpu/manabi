@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { StudyCard } from '../types'
 import { checkAnswer, maskAnswer, toTargetKana, type CheckMode } from '../lib/answer'
-import { cleanReading } from '../lib/speech'
+import { cleanReading, spokenForm } from '../lib/speech'
 import Speaker from './Speaker'
 import StrokeOrder from './StrokeOrder'
 import Components from './Components'
@@ -970,7 +970,11 @@ export default function Study({ deck, deckName, onExit }: Props) {
             >
               <div className="flex items-center justify-center gap-2">
                 <p className="jp text-3xl">{prompt.conjugation.answer}</p>
-                <Speaker text={prompt.conjugation.answer} size="md" />
+                <Speaker
+                  text={spokenForm(prompt.conjugation.answer, prompt.conjugation.answerKana)}
+                  label={prompt.conjugation.answer}
+                  size="md"
+                />
               </div>
               {prompt.conjugation.answerKana !== prompt.conjugation.answer && (
                 <p className="jp mt-1 text-lg text-muted">{prompt.conjugation.answerKana}</p>
@@ -990,7 +994,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
             >
               <div className="flex items-center justify-center gap-2">
                 <p className="jp text-3xl">{prompt.word.reading}</p>
-                <Speaker text={card.glyph} size="md" />
+                <Speaker text={spokenForm(card.glyph, prompt.word.reading)} label={card.glyph} size="md" />
               </div>
               <p className="mt-2 text-lg text-muted">{prompt.word.meaning}</p>
             </div>

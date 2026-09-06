@@ -491,6 +491,35 @@ española enseñaría una pronunciación falsa.
 Un kanji aislado no se pronuncia: 日 es ニチ, ジツ o ひ según la palabra. Por
 eso el audio va en cada lectura por separado, y en las palabras completas.
 
+### Cuál de las voces
+
+Que exista una voz japonesa no basta: hay que elegir cuál. macOS instala
+**ocho voces de broma** —Eddy, Flo, Grandma, Grandpa, Reed, Rocko, Sandy,
+Shelley— con el idioma japonés puesto, y Chromium las devuelve por orden
+alfabético. Coger la primera de la lista, que es lo que se hacía, significaba
+estudiar japonés con Eddy: Kyoko era la quinta.
+
+Ahora se puntúa cada voz —de broma resta, nombre de voz japonesa conocida
+suma, marca de calidad (premium, enhanced, neural, natural) suma más— y se
+elige la mejor. El selector de Progreso las separa en dos grupos, porque por
+el nombre no hay manera de saber cuál es cuál: Eddy y Kyoko se parecen lo
+mismo.
+
+Las que trae el sistema de serie son las comprimidas. En macOS hay versiones
+bastante mejores para descargar en Ajustes del Sistema → Accesibilidad →
+Contenido hablado → Voz del sistema → Gestionar voces → Japonés; al
+instalarlas aparecen solas en la lista y la puntuación las prefiere.
+
+### Qué se reproduce
+
+Dándole kanji, el motor elige la lectura por su cuenta, y no siempre la que
+se está enseñando: 一日 es いちにち o ついたち según el contexto, y el
+contexto aquí no existe. Cuando se conoce la lectura y es kana, se impone.
+
+En los mazos de kana la lectura es rōmaji —«ka»— y ahí manda lo escrito. La
+regla es esa y no una lista de mazos: si la lectura tiene kana, se pronuncia
+la lectura.
+
 ## Atajos
 
 | Tecla | Acción |

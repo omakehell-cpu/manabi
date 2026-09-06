@@ -1,6 +1,6 @@
 {
   "name": "manabi",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Flashcards de japonés con repetición espaciada: kana, kanji, vocabulario, conjugación y gramática",
   "main": "dist-electron/main.js",
   "author": "omakehell",

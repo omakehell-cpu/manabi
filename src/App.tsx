@@ -11,7 +11,10 @@ type View = 'home' | 'explore' | 'stats' | 'credits'
 
 export default function App() {
   const [view, setView] = useState<View>('home')
-  const [studying, setStudying] = useState<string | null>(null)
+  // `null` dentro del objeto significa «todos los mazos»; el objeto ausente
+  // significa que no hay sesión abierta. Con un solo `string | null` no se
+  // podían distinguir esas dos cosas.
+  const [studying, setStudying] = useState<{ deck: string | null } | null>(null)
   const [decks, setDecks] = useState<DeckStats[]>([])
   const [overview, setOverview] = useState<Overview | null>(null)
 
@@ -34,8 +37,14 @@ export default function App() {
   }, [refresh])
 
   if (studying) {
-    const deck = decks.find((d) => d.slug === studying)
-    return <Study deck={studying} deckName={deck?.name ?? studying} onExit={exitStudy} />
+    const deck = decks.find((d) => d.slug === studying.deck)
+    return (
+      <Study
+        deck={studying.deck}
+        deckName={deck?.name ?? 'Todo lo de hoy'}
+        onExit={exitStudy}
+      />
+    )
   }
 
   return (
@@ -63,7 +72,7 @@ export default function App() {
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto">
-        {view === 'home' && <Home decks={decks} onStudy={setStudying} />}
+        {view === 'home' && <Home decks={decks} onStudy={(deck) => setStudying({ deck })} />}
         {view === 'explore' && <Explorer />}
         {view === 'stats' && overview && (
           <Stats

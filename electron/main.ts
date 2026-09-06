@@ -24,6 +24,7 @@ import {
   reviveAllLeeches,
   suspendCard,
   getForecast,
+  getGlobalProgress,
   kanjiStrokes,
   sentenceFor,
   componentsOf,
@@ -132,7 +133,7 @@ app.whenReady().then(() => {
   buildMenu()
   openDatabase(join(app.getPath('userData'), 'manabi.db'))
 
-  ipcMain.handle('queue:get', (_e, slug: string, limit?: number, aheadMinutes?: number) =>
+  ipcMain.handle('queue:get', (_e, slug: string | null, limit?: number, aheadMinutes?: number) =>
     getQueue(slug, limit, aheadMinutes),
   )
   ipcMain.handle('card:grade', (_e, id: number, rating: Grade, ms: number) =>
@@ -149,11 +150,14 @@ app.whenReady().then(() => {
   ipcMain.handle('leeches:reviveAll', () => reviveAllLeeches())
   ipcMain.handle('card:suspend', (_e, cardId: number) => suspendCard(cardId))
   ipcMain.handle('stats:forecast', (_e, days?: number) => getForecast(days))
+  ipcMain.handle('stats:global', () => getGlobalProgress())
   ipcMain.handle('kanji:strokes', (_e, glyph: string) => kanjiStrokes(glyph))
   ipcMain.handle('review:undo', () => undoLastReview())
   ipcMain.handle('review:canUndo', () => canUndo())
   ipcMain.handle('card:get', (_e, cardId: number) => getCard(cardId))
-  ipcMain.handle('lessons:get', (_e, slug: string, limit?: number) => getLessons(slug, limit))
+  ipcMain.handle('lessons:get', (_e, slug: string | null, limit?: number) =>
+    getLessons(slug, limit),
+  )
   ipcMain.handle('lessons:present', (_e, ids: number[]) => markPresented(ids))
   ipcMain.handle('settings:lessonBatch', () => lessonBatchSize())
   ipcMain.handle('settings:setLessonBatch', (_e, v: number) => {

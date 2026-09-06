@@ -1,4 +1,5 @@
-import type { DeckStats } from '../types'
+import { useEffect, useState } from 'react'
+import type { DeckStats, GlobalProgress } from '../types'
 
 const BLURB: Record<string, string> = {
   hiragana: 'Los 104 signos: 46 básicos, 25 con dakuten y 33 combinados.',
@@ -37,7 +38,8 @@ const GATE: Record<string, string> = {
 
 interface Props {
   decks: DeckStats[]
-  onStudy: (slug: string) => void
+  /** null significa estudiar todos los mazos en una sola sesión. */
+  onStudy: (slug: string | null) => void
 }
 
 export default function Home({ decks, onStudy }: Props) {
@@ -52,6 +54,8 @@ export default function Home({ decks, onStudy }: Props) {
       <p className="mt-1 text-sm text-muted">
         Las cartas aparecen cuando FSRS calcula que estás a punto de olvidarlas.
       </p>
+
+      <Today onStudy={onStudy} />
 
       <h2 className="mt-8 text-sm tracking-wide text-muted uppercase">Kana</h2>
       <div className="mt-4 space-y-4">
@@ -186,5 +190,88 @@ function Stat({
       </span>{' '}
       <span className="text-muted">{label}</span>
     </span>
+  )
+}
+
+
+/**
+ * Lo que toca hoy, junto y en un solo botón.
+ *
+ * Con diecinueve mazos, hacer el trabajo del día obligaba a entrar y salir
+ * de cada uno. Aquí se mezclan los repasos de todos —que además es mejor
+ * para la memoria que agruparlos por tema— y las lecciones siguen saliendo
+ * de un mazo por tanda.
+ */
+function Today({ onStudy }: { onStudy: (slug: string | null) => void }) {
+  const [progress, setProgress] = useState<GlobalProgress | null>(null)
+
+  useEffect(() => {
+    void window.manabi.globalProgress().then(setProgress)
+  }, [])
+
+  if (!progress) return null
+
+  const pending = progress.dueToday + progress.lessonsToday
+  const pct = progress.total ? (progress.mature / progress.total) * 100 : 0
+
+  return (
+    <div className="mt-6 rounded-2xl border border-line bg-surface p-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-medium">
+            {pending > 0 ? 'Hoy toca' : 'Nada pendiente hoy'}
+          </h2>
+          <p className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+            {progress.dueToday > 0 && (
+              <span>
+                <span className="font-medium tabular-nums text-accent">{progress.dueToday}</span>{' '}
+                <span className="text-muted">por repasar</span>
+              </span>
+            )}
+            {progress.lessonsToday > 0 && (
+              <span>
+                <span className="font-medium tabular-nums text-warn">{progress.lessonsToday}</span>{' '}
+                <span className="text-muted">por aprender</span>
+              </span>
+            )}
+            {pending === 0 && (
+              <span className="text-muted">Vuelve mañana, o baja el ritmo en Progreso.</span>
+            )}
+          </p>
+        </div>
+
+        <button
+          onClick={() => onStudy(null)}
+          disabled={pending === 0}
+          className="shrink-0 rounded-lg bg-fg px-6 py-3 font-medium text-ink transition-colors hover:bg-white disabled:cursor-not-allowed disabled:bg-raised disabled:text-muted"
+        >
+          {pending > 0 ? `Estudiar ${pending}` : 'Al día'}
+        </button>
+      </div>
+
+      <div className="mt-5 h-2 w-full overflow-hidden rounded-full bg-line">
+        <div
+          className="h-full bg-ok transition-[width] duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="mt-2 flex flex-wrap gap-x-4 text-xs text-muted">
+        <span>
+          <span className="tabular-nums text-ok">{progress.mature.toLocaleString('es')}</span> de{' '}
+          <span className="tabular-nums">{progress.total.toLocaleString('es')}</span> cartas
+          asentadas ({pct.toFixed(1)} %)
+        </span>
+        <span>
+          <span className="tabular-nums">{progress.seen.toLocaleString('es')}</span> vistas alguna
+          vez
+        </span>
+        {progress.daysLeft > 0 && (
+          <span>
+            quedan <span className="tabular-nums">{progress.daysLeft.toLocaleString('es')}</span>{' '}
+            días de material al ritmo actual
+          </span>
+        )}
+      </p>
+    </div>
   )
 }

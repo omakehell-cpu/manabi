@@ -7,7 +7,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 const api = {
   /** Para que la interfaz sepa si debe reservar hueco a los semáforos. */
   platform: process.platform,
-  getQueue: (slug: string, limit?: number, aheadMinutes?: number) =>
+  getQueue: (slug: string | null, limit?: number, aheadMinutes?: number) =>
     ipcRenderer.invoke('queue:get', slug, limit, aheadMinutes),
   grade: (cardId: number, rating: 1 | 2 | 3 | 4, durationMs: number) =>
     ipcRenderer.invoke('card:grade', cardId, rating, durationMs),
@@ -22,11 +22,13 @@ const api = {
   reviveAllLeeches: () => ipcRenderer.invoke('leeches:reviveAll'),
   suspendCard: (cardId: number) => ipcRenderer.invoke('card:suspend', cardId),
   forecast: (days?: number) => ipcRenderer.invoke('stats:forecast', days),
+  globalProgress: () => ipcRenderer.invoke('stats:global'),
   kanjiStrokes: (glyph: string) => ipcRenderer.invoke('kanji:strokes', glyph),
   undo: () => ipcRenderer.invoke('review:undo'),
   canUndo: () => ipcRenderer.invoke('review:canUndo'),
   getCard: (cardId: number) => ipcRenderer.invoke('card:get', cardId),
-  getLessons: (slug: string, limit?: number) => ipcRenderer.invoke('lessons:get', slug, limit),
+  getLessons: (slug: string | null, limit?: number) =>
+    ipcRenderer.invoke('lessons:get', slug, limit),
   markPresented: (ids: number[]) => ipcRenderer.invoke('lessons:present', ids),
   lessonBatch: () => ipcRenderer.invoke('settings:lessonBatch'),
   setLessonBatch: (v: number) => ipcRenderer.invoke('settings:setLessonBatch', v),

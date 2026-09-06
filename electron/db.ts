@@ -796,10 +796,17 @@ export interface StudyCard {
  *   0 al recargar a mitad de sesión: sin ese cero, una única carta pendiente
  *   se serviría en bucle cada pocos segundos.
  */
-export function getQueue(slug: string, limit = 40, aheadMinutes = LEARN_AHEAD_MINUTES): StudyCard[] {
+export function getQueue(
+  slug: string | null,
+  limit = 40,
+  aheadMinutes = LEARN_AHEAD_MINUTES,
+): StudyCard[] {
   const now = new Date()
   const nowIso = now.toISOString()
   const horizon = new Date(now.getTime() + aheadMinutes * 60_000).toISOString()
+  // Con slug nulo se recorren todos los mazos: es la sesión de «lo de hoy».
+  const deckFilter = slug === null ? '' : 'd.slug = ? AND'
+  const deckParam = slug === null ? [] : [slug]
 
   const columns = `c.id AS cardId, i.id AS itemId, d.slug AS deck, d.kind AS deckKind,
               c.card_type AS cardType, i.glyph, i.reading, i.meaning, i.alt,
@@ -813,12 +820,12 @@ export function getQueue(slug: string, limit = 40, aheadMinutes = LEARN_AHEAD_MI
        FROM card c
        JOIN item i ON i.id = c.item_id
        JOIN deck d ON d.id = i.deck_id
-       WHERE d.slug = ? AND c.locked = 0 AND c.suspended = 0 AND c.state != 0
+       WHERE ${deckFilter} c.locked = 0 AND c.suspended = 0 AND c.state != 0
          AND ((c.state IN (1, 3) AND c.due <= ?) OR (c.state = 2 AND c.due <= ?))
        ORDER BY c.due, i.position
        LIMIT ?`,
     )
-    .all(slug, horizon, nowIso, limit) as StudyCard[]
+    .all(...deckParam, horizon, nowIso, limit) as StudyCard[]
 
   // Las nuevas sí: cada una arrastra una decena de repasos futuros, y sin
   // freno la carga se dispara hasta volverse inasumible en dos semanas.
@@ -830,12 +837,12 @@ export function getQueue(slug: string, limit = 40, aheadMinutes = LEARN_AHEAD_MI
            FROM card c
            JOIN item i ON i.id = c.item_id
            JOIN deck d ON d.id = i.deck_id
-           WHERE d.slug = ? AND c.locked = 0 AND c.suspended = 0 AND c.state = 0
+           WHERE ${deckFilter} c.locked = 0 AND c.suspended = 0 AND c.state = 0
              AND c.presented_at IS NOT NULL AND c.due <= ?
            ORDER BY i.position
            LIMIT ?`,
         )
-        .all(slug, nowIso, room) as StudyCard[])
+        .all(...deckParam, nowIso, room) as StudyCard[])
     : []
 
   return [...inProgress, ...fresh]
@@ -927,9 +934,10 @@ export function setLessonBatchSize(value: number): void {
  * Cuántas cartas nuevas admite todavía hoy este mazo, respetando los dos
  * topes: el suyo y el del conjunto. Manda el más restrictivo.
  */
-export function newRemainingToday(slug: string): number {
-  const perDeck = newPerDay() - newIntroducedToday(slug)
+export function newRemainingToday(slug: string | null): number {
   const overall = newPerDayTotal() - newIntroducedTodayTotal()
+  if (slug === null) return Math.max(0, overall)
+  const perDeck = newPerDay() - newIntroducedToday(slug)
   return Math.max(0, Math.min(perDeck, overall))
 }
 
@@ -1641,9 +1649,29 @@ export function getCard(cardId: number): StudyCard | null {
  * Solo se presenta lo que cabe en el cupo diario: las lecciones son la
  * puerta por la que entra el material nuevo.
  */
-export function getLessons(slug: string, limit = lessonBatchSize()): StudyCard[] {
+export function getLessons(slug: string | null, limit = lessonBatchSize()): StudyCard[] {
   const room = Math.min(limit, newRemainingToday(slug))
   if (room <= 0) return []
+
+  // Aunque la sesión junte todos los mazos, cada tanda sale de uno solo:
+  // presentar dos kana y tres kanji a la vez reparte la atención en lugar
+  // de enseñar algo.
+  const target =
+    slug ??
+    (
+      db
+        .prepare(
+          `SELECT d.slug FROM card c
+           JOIN item i ON i.id = c.item_id
+           JOIN deck d ON d.id = i.deck_id
+           WHERE c.locked = 0 AND c.suspended = 0
+             AND c.state = 0 AND c.presented_at IS NULL
+           ORDER BY d.position LIMIT 1`,
+        )
+        .get() as { slug: string } | undefined
+    )?.slug
+
+  if (!target) return []
 
   return db
     .prepare(
@@ -1658,7 +1686,7 @@ export function getLessons(slug: string, limit = lessonBatchSize()): StudyCard[]
        ORDER BY i.position, c.card_type
        LIMIT ?`,
     )
-    .all(slug, room) as StudyCard[]
+    .all(target, room) as StudyCard[]
 }
 
 /** Marca una tanda como presentada; a partir de aquí ya se puede examinar. */
@@ -1817,4 +1845,61 @@ export function componentsOf(glyph: string): KanjiComponent[] {
       known: known.has(part.c),
     }
   })
+}
+
+// ---------------------------------------------------- visión de conjunto
+
+export interface GlobalProgress {
+  /** Cartas del temario entero. */
+  total: number
+  /** Asentadas: las que FSRS ya no considera en aprendizaje. */
+  mature: number
+  /** En aprendizaje ahora mismo. */
+  learning: number
+  /** Vistas alguna vez, aunque sea una. */
+  seen: number
+  /** Repasos pendientes hoy, sumando todos los mazos. */
+  dueToday: number
+  /** Elementos nuevos que admite hoy el cupo. */
+  lessonsToday: number
+  /** Días al ritmo actual para presentar lo que queda. */
+  daysLeft: number
+}
+
+/**
+ * El estado del temario de un vistazo.
+ *
+ * Cada mazo llevaba su cuenta, pero con diecinueve no había forma de saber
+ * cuánto se lleva en total ni cuánto queda, que es lo que da sentido a
+ * seguir un día más.
+ */
+export function getGlobalProgress(): GlobalProgress {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN state = 2 THEN 1 ELSE 0 END) AS mature,
+              SUM(CASE WHEN state IN (1,3) THEN 1 ELSE 0 END) AS learning,
+              SUM(CASE WHEN presented_at IS NOT NULL THEN 1 ELSE 0 END) AS seen
+       FROM card`,
+    )
+    .get() as { total: number; mature: number | null; learning: number | null; seen: number | null }
+
+  const decks = getDeckStats()
+  const dueToday = decks.reduce((n, d) => n + d.due, 0)
+  const lessonsToday = Math.min(
+    decks.reduce((n, d) => n + d.lessons, 0),
+    newRemainingToday(null),
+  )
+
+  const seen = row.seen ?? 0
+  const perDay = newPerDayTotal()
+  return {
+    total: row.total,
+    mature: row.mature ?? 0,
+    learning: row.learning ?? 0,
+    seen,
+    dueToday,
+    lessonsToday,
+    daysLeft: perDay > 0 ? Math.ceil((row.total - seen) / perDay) : 0,
+  }
 }

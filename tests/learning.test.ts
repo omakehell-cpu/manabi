@@ -20,6 +20,7 @@ import {
   listLeeches,
   reviveCard,
   getForecast,
+  getGlobalProgress,
   undoLastReview,
   canUndo,
   getCard,
@@ -567,6 +568,53 @@ describe('cartas apartadas', () => {
     suspendCard(card.cardId)
     expect(listLeeches().some((l) => l.cardId === card.cardId)).toBe(true)
     reviveCard(card.cardId)
+  })
+})
+
+describe('sesión unificada', () => {
+  it('junta los repasos de todos los mazos', () => {
+    setNewPerDay(9999)
+    setNewPerDayTotal(100000)
+    const deUno = getQueue('hiragana', 999, 999)
+    const deTodos = getQueue(null, 999, 999)
+    expect(deTodos.length).toBeGreaterThan(deUno.length)
+    // Y vienen de mazos distintos: eso es lo que evita entrar uno por uno.
+    expect(new Set(deTodos.map((c) => c.deck)).size).toBeGreaterThan(1)
+  })
+
+  it('cada tanda de lecciones sale de un solo mazo', () => {
+    // Presentar dos kana y tres kanji a la vez repartiría la atención en
+    // lugar de enseñar algo.
+    const batch = getLessons(null, 5)
+    expect(batch.length).toBeGreaterThan(0)
+    expect(new Set(batch.map((c) => c.deck)).size).toBe(1)
+  })
+
+  it('respeta el tope global aunque se pidan todos los mazos', () => {
+    setNewPerDayTotal(3)
+    expect(getLessons(null, 40).length).toBeLessThanOrEqual(3)
+    setNewPerDayTotal(100000)
+  })
+})
+
+describe('progreso global', () => {
+  it('cuenta el temario entero, no un mazo', () => {
+    const g = getGlobalProgress()
+    const porMazo = getDeckStats().reduce((n, d) => n + d.total, 0)
+    expect(g.total).toBe(porMazo)
+  })
+
+  it('distingue lo asentado de lo simplemente visto', () => {
+    const g = getGlobalProgress()
+    expect(g.seen).toBeGreaterThanOrEqual(g.mature)
+    expect(g.mature + g.learning).toBeLessThanOrEqual(g.total)
+  })
+
+  it('estima cuánto material queda al ritmo actual', () => {
+    setNewPerDayTotal(40)
+    const g = getGlobalProgress()
+    expect(g.daysLeft).toBe(Math.ceil((g.total - g.seen) / 40))
+    setNewPerDayTotal(100000)
   })
 })
 

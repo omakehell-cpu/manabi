@@ -286,7 +286,8 @@ function formatInterval(minutes: number | undefined): string {
 
 
 interface Props {
-  deck: string
+  /** Mazo a estudiar, o null para juntar todos los que tengan trabajo. */
+  deck: string | null
   deckName: string
   onExit: () => void
 }

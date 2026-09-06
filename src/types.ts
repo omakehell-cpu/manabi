@@ -133,9 +133,19 @@ export interface KanjiComponent {
   known: boolean
 }
 
+export interface GlobalProgress {
+  total: number
+  mature: number
+  learning: number
+  seen: number
+  dueToday: number
+  lessonsToday: number
+  daysLeft: number
+}
+
 export interface ManabiApi {
   platform: string
-  getQueue(slug: string, limit?: number, aheadMinutes?: number): Promise<StudyCard[]>
+  getQueue(slug: string | null, limit?: number, aheadMinutes?: number): Promise<StudyCard[]>
   grade(cardId: number, rating: 1 | 2 | 3 | 4, durationMs: number): Promise<GradeResult>
   previewIntervals(cardId: number): Promise<Record<number, number>>
   deckStats(): Promise<DeckStats[]>
@@ -148,11 +158,12 @@ export interface ManabiApi {
   reviveAllLeeches(): Promise<number>
   suspendCard(cardId: number): Promise<void>
   forecast(days?: number): Promise<Forecast>
+  globalProgress(): Promise<GlobalProgress>
   kanjiStrokes(glyph: string): Promise<string[]>
   undo(): Promise<UndoResult | null>
   canUndo(): Promise<boolean>
   getCard(cardId: number): Promise<StudyCard | null>
-  getLessons(slug: string, limit?: number): Promise<StudyCard[]>
+  getLessons(slug: string | null, limit?: number): Promise<StudyCard[]>
   markPresented(ids: number[]): Promise<void>
   lessonBatch(): Promise<number>
   setLessonBatch(v: number): Promise<number>

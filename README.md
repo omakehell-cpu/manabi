@@ -144,6 +144,35 @@ responde se corrige solo.
 En rōmaji→kana la respuesta es un único signo y enmascararla no diría nada:
 ahí la pista es su primer trazo.
 
+## Todo lo de hoy
+
+Con diecinueve mazos, empezar el día significaba entrar y salir de cada uno
+para ver si tenía algo pendiente. La portada abre con **Hoy toca**: una sola
+cifra con lo vencido más lo nuevo que cabe hoy, y un botón que lo estudia
+todo seguido.
+
+La cola unificada mezcla los repasos de todos los mazos — un repaso es un
+repaso, venga de donde venga — pero **las tandas de lección salen de un solo
+mazo**. Presentar dos kana y tres kanji a la vez reparte la atención en lugar
+de enseñar algo, así que cada tanda de cinco elige el mazo con material nuevo
+más arriba en el orden y se queda ahí.
+
+En la sesión unificada manda solo el tope global: los veinte por mazo existen
+para que un mazo no acapare el cupo cuando lo eliges tú, y aquí no eliges.
+
+Los mazos siguen abajo, con su propio botón, para cuando toca insistir en uno.
+
+## Progreso global
+
+Bajo el botón, una barra con el estado del temario completo: cuántas cartas
+hay asentadas de las 26.926, cuántas has visto alguna vez, y **cuántos días
+de material quedan al ritmo actual** — el resto dividido entre la media de
+lecciones de los últimos catorce días.
+
+Esa última cifra es la que responde a «¿cuánto me falta?», y cambia sola al
+cambiar el ritmo: subir el cupo diario la acorta, saltarse una semana la
+alarga. Sin días estudiados no se muestra, porque no hay ritmo que dividir.
+
 ## Ritmo de estudio
 
 Dos mecanismos gobiernan cuánto trabajo hay cada día, y son lo que separa

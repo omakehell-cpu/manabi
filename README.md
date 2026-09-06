@@ -674,8 +674,13 @@ electron-builder deriva de ahí el `.icns` y el `.ico`.
 
 ## Licencias
 
-La app empaqueta trabajo de terceros que exige atribución; está toda
-recogida en la pantalla **Créditos**.
+El código es [MIT](LICENSE). **Los datos no**: los ficheros de `src/data/`
+derivan de fuentes con licencia propia, dos de ellas share-alike, y se
+redistribuyen conforme a ella. Reutilizar este repositorio significa
+heredar esas condiciones, no solo las de MIT.
+
+La atribución que exigen está recogida además en la pantalla **Créditos**
+de la propia aplicación.
 
 - [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs) — MIT
 - [WanaKana](https://github.com/WaniKani/WanaKana) — MIT

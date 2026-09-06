@@ -5,6 +5,7 @@ import Study from './components/Study'
 import Stats from './components/Stats'
 import Credits from './components/Credits'
 import Explorer from './components/Explorer'
+import { TITLEBAR_INSET } from './lib/platform'
 
 type View = 'home' | 'explore' | 'stats' | 'credits'
 
@@ -39,7 +40,9 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="drag flex shrink-0 items-center gap-1 border-b border-line px-6 pt-3 pb-2 pl-20">
+      <header
+        className={`drag flex shrink-0 items-center gap-1 border-b border-line px-6 pt-3 pb-2 ${TITLEBAR_INSET}`}
+      >
         <span className="mr-4 text-sm font-medium tracking-wide">
           学び <span className="ml-1 text-muted">Manabi</span>
         </span>

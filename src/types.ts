@@ -124,6 +124,7 @@ export interface UndoResult {
 }
 
 export interface ManabiApi {
+  platform: string
   getQueue(slug: string, limit?: number, aheadMinutes?: number): Promise<StudyCard[]>
   grade(cardId: number, rating: 1 | 2 | 3 | 4, durationMs: number): Promise<GradeResult>
   previewIntervals(cardId: number): Promise<Record<number, number>>

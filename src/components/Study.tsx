@@ -7,6 +7,7 @@ import StrokeOrder from './StrokeOrder'
 import LessonCard from './LessonCard'
 import { strokeVisibility, type StrokeMode } from '../lib/prefs'
 import { FORMS } from '../lib/conjugation'
+import { TITLEBAR_INSET } from '../lib/platform'
 
 /** Detalle que se despliega al responder una carta de kanji. */
 interface KanjiDetail {
@@ -600,7 +601,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
     return (
       <div className="flex h-full flex-col">
         <header className="drag flex shrink-0 items-center justify-between px-6 pt-3 pb-2">
-          <div className="no-drag flex items-center gap-3 pl-16">
+          <div className={`no-drag flex items-center gap-3 ${TITLEBAR_INSET}`}>
             <button onClick={onExit} className="text-sm text-muted hover:text-fg">
               ← {deckName}
             </button>
@@ -706,7 +707,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
   return (
     <div className="flex h-full flex-col">
       <header className="drag flex shrink-0 items-center justify-between px-6 pt-3 pb-2">
-        <div className="no-drag flex items-center gap-3 pl-16">
+        <div className={`no-drag flex items-center gap-3 ${TITLEBAR_INSET}`}>
           <button onClick={onExit} className="text-sm text-muted hover:text-fg">
             ← {deckName}
           </button>

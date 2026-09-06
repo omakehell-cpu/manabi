@@ -5,6 +5,8 @@ import { contextBridge, ipcRenderer } from 'electron'
  * en bruto: solo estas funciones concretas.
  */
 const api = {
+  /** Para que la interfaz sepa si debe reservar hueco a los semáforos. */
+  platform: process.platform,
   getQueue: (slug: string, limit?: number, aheadMinutes?: number) =>
     ipcRenderer.invoke('queue:get', slug, limit, aheadMinutes),
   grade: (cardId: number, rating: 1 | 2 | 3 | 4, durationMs: number) =>

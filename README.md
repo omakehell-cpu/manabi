@@ -405,6 +405,18 @@ lecciones, el cupo diario, las cartas apartadas, el explorador, el trazado y
 deshacer, todo sin abrir Electron. Ha cazado varios fallos que la interfaz
 no delataba.
 
+### Diferencias entre sistemas
+
+- **La barra de menú se oculta** (`autoHideMenuBar`). En macOS el menú vive
+  en la barra del sistema, pero en Windows y Linux se dibuja dentro de la
+  ventana y ocupaba una franja permanente. Sigue accesible con la tecla Alt:
+  quitarlo del todo se llevaría por delante los atajos de copiar y pegar.
+- El menú es propio y está en español; el de Electron viene en inglés con
+  entradas que aquí no pintan nada.
+- **El hueco de los semáforos solo se reserva en macOS.** Allí la ventana usa
+  `titleBarStyle: hiddenInset` y los botones flotan sobre el contenido; en
+  Windows la barra es nativa y ese hueco dejaba un vacío a la izquierda.
+
 ### Notas de empaquetado
 
 - **`better-sqlite3` va fuera del bundle** (`external` en

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, Menu, ipcMain, dialog } from 'electron'
 import { join } from 'node:path'
 import { writeFileSync } from 'node:fs'
 import type { Grade } from 'ts-fsrs'
@@ -52,6 +52,10 @@ function createWindow(): void {
     title: 'Manabi',
     backgroundColor: '#0f1115',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    // En Windows y Linux el menú se dibuja dentro de la ventana y ocupa una
+    // franja permanente. Se oculta, pero sigue ahí: la tecla Alt lo muestra.
+    // Quitarlo del todo se llevaría por delante los atajos de edición.
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -67,7 +71,64 @@ function createWindow(): void {
   }
 }
 
+/**
+ * Menú propio, mínimo y en español.
+ *
+ * El de Electron viene en inglés con entradas que aquí no pintan nada. Este
+ * se queda con lo que de verdad se usa —edición, zoom, ventana— y conserva
+ * los atajos de copiar y pegar, que se perderían si se quitara el menú.
+ */
+function buildMenu(): void {
+  const isMac = process.platform === 'darwin'
+
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      ...(isMac
+        ? [{ role: 'appMenu' as const }]
+        : [
+            {
+              label: 'Archivo',
+              submenu: [{ role: 'quit' as const, label: 'Salir' }],
+            },
+          ]),
+      {
+        label: 'Edición',
+        submenu: [
+          { role: 'undo' as const, label: 'Deshacer' },
+          { role: 'redo' as const, label: 'Rehacer' },
+          { type: 'separator' as const },
+          { role: 'cut' as const, label: 'Cortar' },
+          { role: 'copy' as const, label: 'Copiar' },
+          { role: 'paste' as const, label: 'Pegar' },
+          { role: 'selectAll' as const, label: 'Seleccionar todo' },
+        ],
+      },
+      {
+        label: 'Ver',
+        submenu: [
+          { role: 'reload' as const, label: 'Recargar' },
+          { role: 'toggleDevTools' as const, label: 'Herramientas de desarrollo' },
+          { type: 'separator' as const },
+          { role: 'resetZoom' as const, label: 'Tamaño real' },
+          { role: 'zoomIn' as const, label: 'Ampliar' },
+          { role: 'zoomOut' as const, label: 'Reducir' },
+          { type: 'separator' as const },
+          { role: 'togglefullscreen' as const, label: 'Pantalla completa' },
+        ],
+      },
+      {
+        label: 'Ventana',
+        submenu: [
+          { role: 'minimize' as const, label: 'Minimizar' },
+          { role: 'close' as const, label: 'Cerrar' },
+        ],
+      },
+    ]),
+  )
+}
+
 app.whenReady().then(() => {
+  buildMenu()
   openDatabase(join(app.getPath('userData'), 'manabi.db'))
 
   ipcMain.handle('queue:get', (_e, slug: string, limit?: number, aheadMinutes?: number) =>

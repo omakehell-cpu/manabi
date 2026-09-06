@@ -58,6 +58,15 @@ const LEARN_AHEAD_MINUTES = 20
 /** Cartas nuevas por mazo y día si el usuario no ha configurado otra cosa. */
 const DEFAULT_NEW_PER_DAY = 20
 
+/**
+ * Cuántos elementos se presentan juntos antes de examinarlos.
+ *
+ * Cinco no es arbitrario: la memoria de trabajo maneja del orden de cuatro
+ * elementos a la vez, y presentar veinte kanji seguidos reparte la atención
+ * hasta que no queda nada de ninguno.
+ */
+const DEFAULT_LESSON_BATCH = 5
+
 const BLOCK_ORDER = ['gojuon', 'dakuten', 'yoon', 'extended'] as const
 
 const scheduler = fsrs(generatorParameters({ enable_fuzz: true }))
@@ -91,6 +100,13 @@ function migrate(): void {
   )
   if (!reviewColumns.includes('prev_card')) {
     db.exec('ALTER TABLE review ADD COLUMN prev_card TEXT')
+  }
+
+  if (!columns.includes('presented_at')) {
+    db.exec('ALTER TABLE card ADD COLUMN presented_at TEXT')
+    // Lo ya estudiado cuenta como presentado: si no, todo el progreso
+    // anterior volvería a pasar por las lecciones desde cero.
+    db.exec("UPDATE card SET presented_at = last_review WHERE reps > 0")
   }
 }
 
@@ -483,7 +499,7 @@ export function getQueue(slug: string, limit = 40, aheadMinutes = LEARN_AHEAD_MI
            JOIN item i ON i.id = c.item_id
            JOIN deck d ON d.id = i.deck_id
            WHERE d.slug = ? AND c.locked = 0 AND c.suspended = 0 AND c.state = 0
-             AND c.due <= ?
+             AND c.presented_at IS NOT NULL AND c.due <= ?
            ORDER BY i.position
            LIMIT ?`,
         )
@@ -515,19 +531,44 @@ export function newIntroducedToday(slug: string): number {
   ).n
 }
 
-export function newPerDay(): number {
-  const row = db.prepare("SELECT value FROM setting WHERE key = 'new_per_day'").get() as
+export function getSetting(key: string): string | null {
+  const row = db.prepare('SELECT value FROM setting WHERE key = ?').get(key) as
     | { value: string }
     | undefined
-  const parsed = Number(row?.value)
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_NEW_PER_DAY
+  return row?.value ?? null
+}
+
+export function setSetting(key: string, value: string): void {
+  db.prepare(
+    'INSERT INTO setting (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+  ).run(key, value)
+}
+
+function numericSetting(key: string, fallback: number, min: number, max: number): number {
+  const raw = getSetting(key)
+  // Hay que descartar el null antes de convertir: Number(null) es 0, y un
+  // cero pasa el rango de «cartas nuevas al día» tan campante, dejando el
+  // cupo a cero sin que nadie lo haya pedido.
+  if (raw === null) return fallback
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : fallback
+}
+
+export function newPerDay(): number {
+  return numericSetting('new_per_day', DEFAULT_NEW_PER_DAY, 0, 500)
 }
 
 export function setNewPerDay(value: number): void {
-  const clamped = Math.max(0, Math.min(500, Math.round(value)))
-  db.prepare(
-    "INSERT INTO setting (key, value) VALUES ('new_per_day', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-  ).run(String(clamped))
+  setSetting('new_per_day', String(Math.max(0, Math.min(500, Math.round(value)))))
+}
+
+/** Cuántos elementos se presentan juntos antes de examinarlos. */
+export function lessonBatchSize(): number {
+  return numericSetting('lesson_batch', DEFAULT_LESSON_BATCH, 1, 20)
+}
+
+export function setLessonBatchSize(value: number): void {
+  setSetting('lesson_batch', String(Math.max(1, Math.min(20, Math.round(value)))))
 }
 
 /** Cuántas cartas nuevas admite todavía hoy este mazo. */
@@ -657,8 +698,10 @@ export interface DeckStats {
   suspended: number
   /** Ítems que son caracteres o signos, excluidas las palabras de ejemplo. */
   characters: number
-  /** Cartas nuevas que este mazo admite todavía hoy. */
+  /** Cartas nuevas ya presentadas que este mazo admite todavía hoy. */
   newRemaining: number
+  /** Elementos por presentar hoy: la puerta de entrada del material nuevo. */
+  lessons: number
 }
 
 export function getDeckStats(): DeckStats[] {
@@ -676,7 +719,10 @@ export function getDeckStats(): DeckStats[] {
                           OR (c.state = 2 AND c.due <= @now))
                        THEN 1 ELSE 0 END) AS dueInProgress,
               SUM(CASE WHEN c.locked = 0 AND c.suspended = 0 AND c.state = 0
-                        AND c.due <= @now THEN 1 ELSE 0 END) AS New,
+                        AND c.presented_at IS NOT NULL AND c.due <= @now
+                       THEN 1 ELSE 0 END) AS New,
+              SUM(CASE WHEN c.locked = 0 AND c.suspended = 0 AND c.state = 0
+                        AND c.presented_at IS NULL THEN 1 ELSE 0 END) AS unpresented,
               SUM(CASE WHEN c.state IN (1,3) THEN 1 ELSE 0 END) AS learning,
               SUM(CASE WHEN c.state = 2 THEN 1 ELSE 0 END) AS review,
               SUM(c.suspended) AS suspended,
@@ -686,16 +732,22 @@ export function getDeckStats(): DeckStats[] {
        LEFT JOIN card c ON c.item_id = i.id
        GROUP BY d.id ORDER BY d.position`,
     )
-    .all({ now: nowIso, horizon }) as (Omit<DeckStats, 'due' | 'newRemaining'> & {
+    .all({ now: nowIso, horizon }) as (Omit<DeckStats, 'due' | 'newRemaining' | 'lessons'> & {
     dueInProgress: number
+    unpresented: number
   })[]
 
   // `due` debe ser lo que la sesión va a servir de verdad, no todo lo que
   // existe: anunciar «Estudiar 79» y luego entregar 20 sería mentir.
   return rows.map((r) => {
     const newRemaining = Math.min(r.New, newRemainingToday(r.slug))
-    const { dueInProgress, ...rest } = r
-    return { ...rest, due: dueInProgress + newRemaining, newRemaining }
+    const { dueInProgress, unpresented, ...rest } = r
+    return {
+      ...rest,
+      due: dueInProgress + newRemaining,
+      newRemaining,
+      lessons: Math.min(unpresented, Math.max(0, newPerDay() - newIntroducedToday(r.slug))),
+    }
   })
 }
 
@@ -1207,4 +1259,74 @@ export function getCard(cardId: number): StudyCard | null {
        WHERE c.id = ?`,
     )
     .get(cardId) ?? null) as StudyCard | null
+}
+
+// ----------------------------------------------------------- lecciones
+
+/**
+ * Siguiente tanda de elementos por presentar.
+ *
+ * Una carta nueva no entra en el examen hasta pasar por aquí. Preguntar por
+ * un kanji que nunca se ha mostrado no mide la memoria: garantiza un fallo,
+ * ensucia el cálculo de FSRS —que lo interpreta como «esto te cuesta»— y
+ * acerca la carta al umbral de las apartadas por motivos que no son suyos.
+ *
+ * Solo se presenta lo que cabe en el cupo diario: las lecciones son la
+ * puerta por la que entra el material nuevo.
+ */
+export function getLessons(slug: string, limit = lessonBatchSize()): StudyCard[] {
+  const room = Math.min(limit, newRemainingToday(slug))
+  if (room <= 0) return []
+
+  return db
+    .prepare(
+      `SELECT c.id AS cardId, i.id AS itemId, d.slug AS deck, d.kind AS deckKind,
+              c.card_type AS cardType, i.glyph, i.reading, i.meaning, i.alt,
+              i.block, c.state, c.reps, c.due
+       FROM card c
+       JOIN item i ON i.id = c.item_id
+       JOIN deck d ON d.id = i.deck_id
+       WHERE d.slug = ? AND c.locked = 0 AND c.suspended = 0
+         AND c.state = 0 AND c.presented_at IS NULL
+       ORDER BY i.position, c.card_type
+       LIMIT ?`,
+    )
+    .all(slug, room) as StudyCard[]
+}
+
+/** Marca una tanda como presentada; a partir de aquí ya se puede examinar. */
+export function markPresented(cardIds: number[]): void {
+  if (!cardIds.length) return
+  const now = new Date().toISOString()
+  const stmt = db.prepare('UPDATE card SET presented_at = ? WHERE id = ? AND presented_at IS NULL')
+  db.transaction(() => {
+    for (const id of cardIds) stmt.run(now, id)
+  })()
+}
+
+/** Cuántos elementos quedan hoy por presentar en un mazo. */
+export function lessonsRemaining(slug: string): number {
+  const available = (
+    db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM card c
+         JOIN item i ON i.id = c.item_id
+         JOIN deck d ON d.id = i.deck_id
+         WHERE d.slug = ? AND c.locked = 0 AND c.suspended = 0
+           AND c.state = 0 AND c.presented_at IS NULL`,
+      )
+      .get(slug) as { n: number }
+  ).n
+  return Math.min(available, newRemainingToday(slug))
+}
+
+/** Palabras de ejemplo de un kanji, para enseñarlas junto al carácter. */
+export function wordsForKanji(glyph: string): { word: string; reading: string; meaning: string }[] {
+  return db
+    .prepare(
+      `SELECT i.glyph AS word, i.reading, i.meaning
+       FROM item i WHERE i.block = 'word' AND i.row_key = ?
+       ORDER BY i.position LIMIT 4`,
+    )
+    .all(glyph) as { word: string; reading: string; meaning: string }[]
 }

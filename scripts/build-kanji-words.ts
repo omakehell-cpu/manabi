@@ -32,7 +32,7 @@ if (!SRC) {
 }
 
 /** Cuántas palabras como máximo por kanji. */
-const PER_KANJI = 3
+const PER_KANJI = 4
 /** Una glosa más larga que esto es una definición, no una traducción. */
 const MAX_GLOSS = 42
 

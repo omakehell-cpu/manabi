@@ -47,6 +47,9 @@ CREATE TABLE IF NOT EXISTS card (
   -- Lapsus a partir de los cuales se aparta. Sube al reactivarla, para dar
   -- un ciclo limpio sin falsear el historial que FSRS usa para calcular.
   leech_at       INTEGER NOT NULL DEFAULT 8,
+  -- Cuándo se presentó la carta. Hasta entonces no entra en el examen:
+  -- preguntar algo que nunca se ha enseñado no mide memoria, mide nada.
+  presented_at   TEXT,
   UNIQUE (item_id, card_type)
 );
 

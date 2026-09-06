@@ -29,6 +29,7 @@ export interface DeckStats {
   suspended: number
   characters: number
   newRemaining: number
+  lessons: number
 }
 
 export interface Overview {
@@ -121,6 +122,14 @@ export interface ManabiApi {
   undo(): Promise<UndoResult | null>
   canUndo(): Promise<boolean>
   getCard(cardId: number): Promise<StudyCard | null>
+  getLessons(slug: string, limit?: number): Promise<StudyCard[]>
+  markPresented(ids: number[]): Promise<void>
+  lessonsRemaining(slug: string): Promise<number>
+  lessonBatch(): Promise<number>
+  setLessonBatch(v: number): Promise<number>
+  wordsForKanji(glyph: string): Promise<{ word: string; reading: string; meaning: string }[]>
+  getSetting(key: string): Promise<string | null>
+  setSetting(key: string, value: string): Promise<void>
   newPerDay(): Promise<number>
   setNewPerDay(value: number): Promise<number>
   overview(): Promise<Overview>

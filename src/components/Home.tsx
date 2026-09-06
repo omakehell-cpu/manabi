@@ -64,7 +64,9 @@ function DeckCard({
   onStudy: (slug: string) => void
   compact?: boolean
 }) {
-  const canStudy = d.due > 0
+  // Aprender y repasar son cosas distintas y conviene verlas separadas:
+  // una sesión de 20 repasos no se parece en nada a una de 5 elementos nuevos.
+  const canStudy = d.due + d.lessons > 0
   // Un mazo con todo bloqueado aún no ha empezado: mejor decir qué lo abre
   // que mostrar un «Al día» que suena a que ya está hecho.
   const untouched = d.locked === d.total && d.total > 0
@@ -85,8 +87,8 @@ function DeckCard({
           ) : (
             <>
               <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-                <Stat label="pendientes" value={d.due} tone={d.due ? 'accent' : undefined} />
-                <Stat label="nuevas" value={d.New} />
+                <Stat label="por repasar" value={d.due} tone={d.due ? 'accent' : undefined} />
+                <Stat label="por aprender" value={d.lessons} tone={d.lessons ? 'warn' : undefined} />
                 <Stat label="aprendiendo" value={d.learning} />
                 <Stat label="asentadas" value={d.review} tone="ok" />
                 {d.locked > 0 && <Stat label="bloqueadas" value={d.locked} muted />}
@@ -116,7 +118,13 @@ function DeckCard({
           disabled={!canStudy}
           className="shrink-0 rounded-lg bg-fg px-5 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-white disabled:cursor-not-allowed disabled:bg-raised disabled:text-muted"
         >
-          {canStudy ? `Estudiar ${d.due}` : untouched ? 'Bloqueado' : 'Al día'}
+          {canStudy
+            ? d.due > 0
+              ? `Repasar ${d.due}`
+              : `Aprender ${d.lessons}`
+            : untouched
+              ? 'Bloqueado'
+              : 'Al día'}
         </button>
       </div>
     </div>
@@ -131,14 +139,14 @@ function Stat({
 }: {
   label: string
   value: number
-  tone?: 'ok' | 'accent'
+  tone?: 'ok' | 'accent' | 'warn'
   muted?: boolean
 }) {
   return (
     <span className={muted ? 'text-muted/70' : ''}>
       <span
         className={`font-medium tabular-nums ${
-          tone === 'ok' ? 'text-ok' : tone === 'accent' ? 'text-accent' : ''
+          tone === 'ok' ? 'text-ok' : tone === 'accent' ? 'text-accent' : tone === 'warn' ? 'text-warn' : ''
         }`}
       >
         {value}

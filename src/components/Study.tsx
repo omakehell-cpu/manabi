@@ -4,6 +4,8 @@ import { checkAnswer, toTargetKana, type CheckMode } from '../lib/answer'
 import { cleanReading } from '../lib/speech'
 import Speaker from './Speaker'
 import StrokeOrder from './StrokeOrder'
+import LessonCard from './LessonCard'
+import { strokeVisibility, type StrokeMode } from '../lib/prefs'
 
 /** Detalle que se despliega al responder una carta de kanji. */
 interface KanjiDetail {
@@ -165,6 +167,17 @@ export default function Study({ deck, deckName, onExit }: Props) {
   const [tally, setTally] = useState({ right: 0, wrong: 0 })
   const [done, setDone] = useState(0)
   const [justSuspended, setJustSuspended] = useState(false)
+  /** Tanda que se está presentando; vacía mientras se examina. */
+  const [lesson, setLesson] = useState<StudyCard[]>([])
+  const [lessonAt, setLessonAt] = useState(0)
+  /**
+   * Cartas de la tanda recién presentada que aún no se han acertado. Se
+   * gestiona en memoria porque el lote se repite hasta acertarlo entero,
+   * y eso ocurre en segundos: pedirlo a la base de datos cada vez sería
+   * pelearse con las fechas de FSRS por nada.
+   */
+  const [batch, setBatch] = useState<StudyCard[] | null>(null)
+  const [strokeMode, setStrokeMode] = useState<StrokeMode>('always')
   /** Notas dadas en esta sesión, para revertir el recuento al deshacer. */
   const history = useRef<(1 | 2 | 3 | 4)[]>([])
   const [exhausted, setExhausted] = useState<Exhausted | null>(null)
@@ -172,10 +185,41 @@ export default function Study({ deck, deckName, onExit }: Props) {
   const shownAt = useRef(Date.now())
 
   useEffect(() => {
-    window.manabi.getQueue(deck, 40).then((q) => {
-      setQueue(q)
+    void strokeVisibility().then(setStrokeMode)
+  }, [])
+
+  /** Abre la siguiente tanda de lecciones; devuelve false si no queda ninguna. */
+  const openLessons = useCallback(async () => {
+    const next = await window.manabi.getLessons(deck)
+    if (!next.length) return false
+    setLesson(next)
+    setLessonAt(0)
+    return true
+  }, [deck])
+
+  useEffect(() => {
+    let alive = true
+    // Los repasos vencidos van primero: son deuda contraída. Solo cuando no
+    // queda ninguno se abre material nuevo.
+    void (async () => {
+      const q = await window.manabi.getQueue(deck, 40)
+      if (!alive) return
+      if (q.length) {
+        setQueue(q)
+      } else {
+        const opened = await window.manabi.getLessons(deck)
+        if (!alive) return
+        if (opened.length) {
+          setLesson(opened)
+          setLessonAt(0)
+        }
+        setQueue([])
+      }
       shownAt.current = Date.now()
-    })
+    })()
+    return () => {
+      alive = false
+    }
   }, [deck])
 
   /**
@@ -198,6 +242,15 @@ export default function Study({ deck, deckName, onExit }: Props) {
       shownAt.current = Date.now()
       return
     }
+    // Sin repasos que tocar, es el momento de abrir material nuevo.
+    const lessons = await window.manabi.getLessons(deck)
+    if (lessons.length) {
+      setLesson(lessons)
+      setLessonAt(0)
+      setQueue([])
+      setIndex(0)
+      return
+    }
     const soon = await window.manabi.getQueue(deck, 40)
     if (!soon.length) {
       setExhausted({ pending: 0, minutes: 0 })
@@ -218,26 +271,58 @@ export default function Study({ deck, deckName, onExit }: Props) {
     shownAt.current = Date.now()
   }, [deck])
 
-  const card = exhausted ? undefined : queue?.[index]
+  const card = exhausted ? undefined : (batch ? batch[0] : queue?.[index])
   const prompt = useMemo(() => (card ? buildPrompt(card) : null), [card])
 
   // Vista previa en vivo de la conversión rōmaji → kana.
   const livePreview =
     prompt?.mode === 'kana' && value ? toTargetKana(value, prompt.expected) : null
 
+  /** Pasa a la siguiente ficha de la presentación, o abre el examen del lote. */
+  const advanceLesson = useCallback(async () => {
+    if (lessonAt + 1 < lesson.length) {
+      setLessonAt((i) => i + 1)
+      return
+    }
+    // Presentada la tanda entera, se examina inmediatamente: es el repaso
+    // en caliente lo que la fija.
+    await window.manabi.markPresented(lesson.map((c) => c.cardId))
+    setBatch(lesson)
+    setLesson([])
+    setLessonAt(0)
+    setPhase('asking')
+    setValue('')
+    shownAt.current = Date.now()
+  }, [lesson, lessonAt])
+
   const advance = useCallback(() => {
     setPhase('asking')
     setValue('')
     setJustSuspended(false)
     setDone((d) => d + 1)
-    if (queue && index + 1 >= queue.length) {
+
+    if (batch) {
+      // El lote se repite hasta acertar cada carta una vez. Las falladas
+      // vuelven al final, no se pierden.
+      const [current, ...rest] = batch
+      const failed = phase === 'wrong'
+      const remaining = failed ? [...rest, current] : rest
+      if (remaining.length) {
+        setBatch(remaining)
+      } else {
+        setBatch(null)
+        void (async () => {
+          if (!(await openLessons())) void refill()
+        })()
+      }
+    } else if (queue && index + 1 >= queue.length) {
       void refill()
     } else {
       setIndex((i) => i + 1)
     }
     shownAt.current = Date.now()
     inputRef.current?.focus()
-  }, [queue, index, refill])
+  }, [queue, index, refill, batch, phase, openLessons])
 
   const submit = useCallback(async () => {
     if (!card || !prompt || phase !== 'asking' || !value.trim()) return
@@ -318,6 +403,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
       if (e.key === 'Escape') return onExit()
       if (e.key === 'Enter') {
         e.preventDefault()
+        if (lesson.length) return void advanceLesson()
         return phase === 'asking' ? void submit() : advance()
       }
       if (phase === 'right') {
@@ -327,18 +413,51 @@ export default function Study({ deck, deckName, onExit }: Props) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [phase, submit, advance, regrade, onExit, undo])
+  }, [phase, submit, advance, regrade, onExit, undo, lesson, advanceLesson])
 
-  // `queue` va en las dependencias a propósito: en el primer render la cola
-  // aún no ha llegado y no existe el input, así que sin ella el foco inicial
-  // nunca se aplicaba y había que hacer clic para empezar a escribir.
+  // Las dependencias son todo lo que puede hacer aparecer el input o cambiar
+  // de carta: la cola que llega tarde, el avance dentro de ella, y el lote
+  // de una lección, que sustituye a la cola sin tocar el índice. Si falta
+  // alguna, el campo no recibe el foco y hay que hacer clic para escribir.
   useEffect(() => {
     inputRef.current?.focus()
-  }, [index, phase, queue])
+  }, [index, phase, queue, batch, lesson])
 
   if (!queue) return <Centered>Cargando…</Centered>
 
-  if (queue.length === 0) {
+  if (lesson.length) {
+    return (
+      <div className="flex h-full flex-col">
+        <header className="drag flex shrink-0 items-center justify-between px-6 pt-3 pb-2">
+          <div className="no-drag flex items-center gap-3 pl-16">
+            <button onClick={onExit} className="text-sm text-muted hover:text-fg">
+              ← {deckName}
+            </button>
+          </div>
+          <span className="text-sm text-muted">Aprendiendo</span>
+        </header>
+        <div className="h-0.5 w-full shrink-0 bg-line">
+          <div
+            className="h-full bg-warn transition-[width] duration-300"
+            style={{ width: `${(lessonAt / lesson.length) * 100}%` }}
+          />
+        </div>
+        <LessonCard
+          key={lesson[lessonAt].cardId}
+          card={lesson[lessonAt]}
+          position={lessonAt + 1}
+          total={lesson.length}
+          showStrokes={strokeMode !== 'never'}
+          onNext={() => void advanceLesson()}
+        />
+      </div>
+    )
+  }
+
+  // El lote recién presentado vive aparte de la cola de repasos, que puede
+  // estar vacía: sin esta condición, terminar la presentación caía en
+  // «nada pendiente» y las cinco cartas nunca llegaban a examinarse.
+  if (queue.length === 0 && !batch) {
     return (
       <Centered>
         <p className="text-2xl">Nada pendiente en {deckName}</p>
@@ -411,7 +530,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
   }
 
   const answered = phase !== 'asking'
-  const progress = (index / queue.length) * 100
+  const progress = batch ? 0 : (index / queue.length) * 100
 
   return (
     <div className="flex h-full flex-col">
@@ -432,7 +551,8 @@ export default function Study({ deck, deckName, onExit }: Props) {
             </button>
           )}
           <span className="text-sm tabular-nums text-muted">
-            {done} {done === 1 ? 'carta' : 'cartas'} · quedan {queue.length - index}
+            {done} {done === 1 ? 'carta' : 'cartas'} · quedan{' '}
+            {batch ? batch.length : queue.length - index}
           </span>
         </div>
       </header>
@@ -445,7 +565,10 @@ export default function Study({ deck, deckName, onExit }: Props) {
       </div>
 
       <main className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-6 py-8">
-        <p className="mb-6 text-sm tracking-wide text-muted uppercase">{prompt.question}</p>
+        <p className="mb-6 flex items-center gap-2 text-sm tracking-wide text-muted uppercase">
+          {batch && <span className="rounded bg-warn/15 px-2 py-0.5 text-xs text-warn">nuevo</span>}
+          {prompt.question}
+        </p>
 
         <div
           key={card.cardId}
@@ -507,7 +630,14 @@ export default function Study({ deck, deckName, onExit }: Props) {
           )}
 
           {answered && prompt.kanji && (
-            <KanjiPanel detail={prompt.kanji} failed={phase === 'wrong'} glyph={card.glyph} />
+            <KanjiPanel
+              detail={prompt.kanji}
+              failed={phase === 'wrong'}
+              glyph={card.glyph}
+              showStrokes={
+                strokeMode === 'always' || (strokeMode === 'onError' && phase === 'wrong')
+              }
+            />
           )}
 
           {answered && prompt.word && (
@@ -557,19 +687,20 @@ function KanjiPanel({
   detail,
   failed,
   glyph,
+  showStrokes,
 }: {
   detail: KanjiDetail
   failed: boolean
   glyph: string
+  showStrokes: boolean
 }) {
   return (
     <div
       className={`mt-5 rounded-xl px-5 py-4 ${failed ? 'bg-accent-soft' : 'bg-surface border border-line'}`}
     >
-      {/* Se anima al fallar: es cuando conviene fijarse en cómo se escribe. */}
-      {failed && (
+      {showStrokes && (
         <div className="mb-4 flex justify-center">
-          <StrokeOrder glyph={glyph} size={140} autoPlay />
+          <StrokeOrder glyph={glyph} size={140} autoPlay={failed} />
         </div>
       )}
       <p className="text-center text-lg">{detail.meanings.join(', ')}</p>

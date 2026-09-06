@@ -9,6 +9,7 @@ import {
   setSpeechRate,
 } from '../lib/speech'
 import { useVoicesReady } from './Speaker'
+import { setStrokeVisibility, strokeVisibility, type StrokeMode } from '../lib/prefs'
 import Forecast from './Forecast'
 import Leeches from './Leeches'
 
@@ -143,7 +144,8 @@ function StudySettings() {
   return (
     <>
       <h2 className="mt-12 text-sm tracking-wide text-muted uppercase">Ritmo de estudio</h2>
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <LessonBatch />
+      <div className="mt-5 flex flex-wrap items-center gap-3">
         <label htmlFor="nuevas" className="w-24 text-sm text-muted">
           Nuevas al día
         </label>
@@ -170,7 +172,90 @@ function StudySettings() {
         limitan: el tope solo controla cuánto material nuevo entra. Con 20 al día,
         los 104 hiragana llevan poco más de una semana.
       </p>
+
+      <StrokeSetting />
     </>
+  )
+}
+
+/**
+ * Cuántos elementos se presentan juntos antes de examinarlos. Cinco no es
+ * arbitrario: la memoria de trabajo maneja del orden de cuatro a la vez, y
+ * presentar veinte seguidos reparte la atención hasta no dejar nada.
+ */
+function LessonBatch() {
+  const [value, setValue] = useState<number | null>(null)
+
+  useEffect(() => {
+    void window.manabi.lessonBatch().then(setValue)
+  }, [])
+
+  if (value === null) return null
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-3">
+      <label htmlFor="lote" className="w-24 text-sm text-muted">
+        Por tanda
+      </label>
+      <input
+        id="lote"
+        type="range"
+        min={1}
+        max={12}
+        step={1}
+        value={value}
+        onChange={(e) => {
+          const v = Number(e.target.value)
+          setValue(v)
+          void window.manabi.setLessonBatch(v)
+        }}
+        className="w-48 accent-[var(--color-accent)]"
+      />
+      <span className="text-sm tabular-nums text-muted">
+        {value} {value === 1 ? 'elemento' : 'elementos'}
+      </span>
+    </div>
+  )
+}
+
+const STROKE_LABELS: Record<StrokeMode, string> = {
+  always: 'Siempre',
+  onError: 'Solo al fallar',
+  never: 'Nunca',
+}
+
+function StrokeSetting() {
+  const [mode, setMode] = useState<StrokeMode | null>(null)
+
+  useEffect(() => {
+    void strokeVisibility().then(setMode)
+  }, [])
+
+  if (!mode) return null
+
+  return (
+    <div className="mt-6 flex flex-wrap items-center gap-3">
+      <label htmlFor="trazos" className="w-24 text-sm text-muted">
+        Orden de trazos
+      </label>
+      <select
+        id="trazos"
+        value={mode}
+        onChange={(e) => {
+          const v = e.target.value as StrokeMode
+          setMode(v)
+          void setStrokeVisibility(v)
+        }}
+        className="rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-muted"
+      >
+        {(Object.keys(STROKE_LABELS) as StrokeMode[]).map((m) => (
+          <option key={m} value={m}>
+            {STROKE_LABELS[m]}
+          </option>
+        ))}
+      </select>
+      <span className="text-sm text-muted">durante el estudio</span>
+    </div>
   )
 }
 

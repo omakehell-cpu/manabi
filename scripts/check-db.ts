@@ -23,6 +23,10 @@ import {
   undoLastReview,
   canUndo,
   getCard,
+  getLessons,
+  markPresented,
+  lessonsRemaining,
+  lessonBatchSize,
 } from '../electron/db'
 
 const DB = process.env.CHECK_DB ?? '/tmp/manabi-check.db'
@@ -55,25 +59,59 @@ expect('cartas hiragana', stats0.find((d) => d.slug === 'hiragana')?.total, (v) 
 expect('cartas katakana', stats0.find((d) => d.slug === 'katakana')?.total, (v) => v === 233, 'esperado 233')
 expect('cartas vocab', stats0.find((d) => d.slug === 'vocab')?.total, (v) => v === 180, 'esperado 90×2')
 
+console.log('\nLecciones: nada se examina sin presentarse antes')
+expect('la cola arranca vacía', getQueue('hiragana', 500).length, (v) => v === 0,
+  'sin presentar, no debe haber nada que examinar')
+expect('hay lecciones esperando', lessonsRemaining('hiragana'), (v) => v > 0, '')
+expect('tamaño de tanda por defecto', lessonBatchSize(), (v) => v === 5, 'esperado 5')
+
+const firstBatch = getLessons('hiragana')
+expect('la tanda trae 5', firstBatch.length, (v) => v === 5, '')
+console.log(`  primera tanda: ${firstBatch.map((c) => c.glyph).join(' ')}`)
+expect('todas sin estrenar', firstBatch.every((c) => c.state === 0), (v) => v === true, '')
+
+markPresented(firstBatch.map((c) => c.cardId))
+const afterPresent = getQueue('hiragana', 500)
+expect('tras presentarlas ya se examinan', afterPresent.length, (v) => v === 5, '')
+expect('y son las mismas', afterPresent.every((c) => firstBatch.some((f) => f.cardId === c.cardId)), (v) => v === true, '')
+expect('no se cuela nada más', getQueue('hiragana', 500).length, (v) => v === 5, 'solo lo presentado')
+
+/**
+ * Presenta todo lo disponible de un mazo. Las comprobaciones de progresión
+ * necesitan avanzar niveles enteros, y desde que existen las lecciones nada
+ * llega al examen sin pasar antes por aquí.
+ */
+function presentAll(slug: string): void {
+  for (let i = 0; i < 600; i++) {
+    const b = getLessons(slug, 100)
+    if (!b.length) return
+    markPresented(b.map((c) => c.cardId))
+  }
+}
+
+// El cupo diario se prueba más abajo; aquí estorbaría.
+setNewPerDay(9999)
+presentAll('hiragana')
+
 console.log('\nEstado de arranque')
 const q0 = getQueue('hiragana', 500)
 expect('solo gojūon en cola', [...new Set(q0.map((c) => c.block))], (v) => v.length === 1 && v[0] === 'gojuon', 'no deben abrirse dakuten ni yōon')
 expect('solo reconocimiento', [...new Set(q0.map((c) => c.cardType))], (v) => v.length === 1 && v[0] === 'recognition', 'la evocación nace bloqueada')
-// Ya no se sirven los 46 de golpe: el cupo diario los reparte en tandas.
-expect('la primera tanda respeta el cupo', q0.length, (v) => v === 20, 'esperado el tope diario')
+expect('ya presentadas, se pueden examinar', q0.length, (v) => v > 0, '')
 expect('vocab cerrado', getQueue('vocab', 500).length, (v) => v === 0, 'ninguna palabra antes de saber kana')
 
-// El resto de comprobaciones necesita avanzar niveles enteros, cosa que el
-// cupo impide a propósito. Se levanta aquí y se restaura al probarlo.
-setNewPerDay(9999)
+
 
 console.log('\nAsentando el gojūon hiragana…')
 for (let round = 0; round < 10; round++) {
+  presentAll('hiragana')
   const q = getQueue('hiragana', 500).filter((c) => c.block === 'gojuon' && c.cardType === 'recognition')
   if (!q.length) break
   for (const c of q) gradeCard(c.cardId, 4, 1500)
 }
 
+presentAll('hiragana')
+presentAll('vocab')
 const q1 = getQueue('hiragana', 500)
 const blocks1 = [...new Set(q1.map((c) => c.block))]
 const types1 = [...new Set(q1.map((c) => c.cardType))]
@@ -113,34 +151,46 @@ const n5 = kanjiDecks.find((d) => d.slug === 'kanji-n5')!
 // 79 kanji × 2 cartas (significado y lectura) + las palabras que introducen.
 expect('N5: 158 cartas de kanji + palabras', n5.total, (v) => v > 158, 'esperado 158 más las palabras')
 expect('N5 tiene palabras asociadas', n5.total - 158, (v) => v > 0, 'faltan las palabras de ejemplo')
-expect('N5 abierto de entrada', n5.due, (v) => v === 79, 'solo los significados')
+expect('N5 arranca con lecciones', n5.lessons, (v) => v === 79, 'los 79 significados por presentar')
+expect('y nada que examinar aún', n5.due, (v) => v === 0, 'nada se examina sin presentarse')
+
+// Los kanji se presentan igual que los kana, y solo el significado: la
+// lectura llega cuando el significado esté asentado.
+const kanjiLesson = getLessons('kanji-n5')
+expect('los kanji también se presentan', kanjiLesson.length, (v) => v > 0, '')
+expect('y solo el significado primero', [...new Set(kanjiLesson.map((c) => c.cardType))],
+  (v) => v.length === 1 && v[0] === 'meaning', 'la lectura llega después')
 expect(
   'niveles superiores cerrados',
-  kanjiDecks.filter((d) => d.slug !== 'kanji-n5').every((d) => d.due === 0),
+  kanjiDecks.filter((d) => d.slug !== 'kanji-n5').every((d) => d.due + d.lessons === 0),
   (v) => v === true,
   'N4–N1 no deben abrirse todavía',
 )
 
+presentAll('kanji-n5')
 const kq = getQueue('kanji-n5', 500)
 expect('solo significados', [...new Set(kq.map((c) => c.cardType))], (v) => v.length === 1 && v[0] === 'meaning', 'la lectura espera al significado')
 console.log('  primeros por frecuencia:', kq.slice(0, 10).map((c) => c.glyph).join(' '))
 
+presentAll('kanji-n5')
 console.log('\nAsentando los significados de N5…')
 for (let round = 0; round < 10; round++) {
+  presentAll('kanji-n5')
   const q = getQueue('kanji-n5', 500).filter((c) => c.cardType === 'meaning')
   if (!q.length) break
   for (const c of q) gradeCard(c.cardId, 4, 1500)
 }
 
+presentAll('kanji-n5')
 const kq2 = getQueue('kanji-n5', 500)
 expect('se abre la lectura', [...new Set(kq2.map((c) => c.cardType))], (v) => v.includes('reading'), 'tras el significado toca la lectura')
 const n4after = getDeckStats().find((d) => d.slug === 'kanji-n4')!
-expect('se abre N4', n4after.due, (v) => v > 0, 'N4 debe abrirse al 80 % de N5')
+expect('se abre N4', n4after.due + n4after.lessons, (v) => v > 0, 'N4 debe abrirse al 80 % de N5')
 const n3after = getDeckStats().find((d) => d.slug === 'kanji-n3')!
-expect('N3 sigue cerrado', n3after.due, (v) => v === 0, 'no debe saltarse un nivel')
+expect('N3 sigue cerrado', n3after.due + n3after.lessons, (v) => v === 0, 'no debe saltarse un nivel')
 
 const n1 = getDeckStats().find((d) => d.slug === 'kanji-n1')!
-expect('N1 cerrado', n1.due, (v) => v === 0, 'aún queda mucho para N1')
+expect('N1 cerrado', n1.due + n1.lessons, (v) => v === 0, 'aún queda mucho para N1')
 
 console.log('\nKanji: palabras')
 const wordsBefore = getQueue('kanji-n5', 999).filter((c) => c.cardType === 'word')
@@ -148,11 +198,13 @@ expect('sin palabras todavía', wordsBefore.length, (v) => v === 0, 'las palabra
 
 console.log('Asentando también las lecturas de N5…')
 for (let round = 0; round < 10; round++) {
+  presentAll('kanji-n5')
   const q = getQueue('kanji-n5', 999).filter((c) => c.cardType === 'reading')
   if (!q.length) break
   for (const c of q) gradeCard(c.cardId, 4, 1500)
 }
 
+presentAll('kanji-n5')
 const wordsAfter = getQueue('kanji-n5', 999).filter((c) => c.cardType === 'word')
 expect('se abren las palabras', wordsAfter.length, (v) => v > 0, 'tras dominar el kanji aislado')
 console.log('  ejemplos:', wordsAfter.slice(0, 8).map((c) => `${c.glyph}(${c.reading})`).join(' '))
@@ -182,17 +234,14 @@ setNewPerDay(20)
 expect('valor por defecto', newPerDay(), (v) => v === 20, 'esperado 20')
 
 setNewPerDay(5)
-const limited = getQueue('katakana', 40)
-expect('la cola respeta el cupo', limited.length, (v) => v === 5, 'debía servir solo 5 nuevas')
+const limited = getLessons('katakana', 40)
+expect('las lecciones respetan el cupo', limited.length, (v) => v === 5, 'debía ofrecer solo 5 nuevas')
+markPresented(limited.map((c) => c.cardId))
 
 for (const c of limited) gradeCard(c.cardId, 3, 1000)
 expect('se contabilizan como estrenadas hoy', newIntroducedToday('katakana'), (v) => v === 5, 'esperado 5')
-expect(
-  'agotado el cupo, no entran más nuevas',
-  getQueue('katakana', 40, 0).filter((c) => c.state === 0).length,
-  (v) => v === 0,
-  'el tope no se está aplicando',
-)
+expect('agotado el cupo, no hay más lecciones', getLessons('katakana', 40).length, (v) => v === 0,
+  'el tope no se está aplicando')
 
 const kStats = getDeckStats().find((d) => d.slug === 'katakana')!
 expect('las estadísticas reflejan el cupo', kStats.newRemaining, (v) => v === 0, 'debería anunciar 0 nuevas')
@@ -246,6 +295,7 @@ console.log('\nCartas apartadas')
 expect('de entrada no hay ninguna', listLeeches().length, (v) => v === 0, '')
 
 // Fallar la misma carta hasta pasar el umbral de ocho lapsus.
+presentAll('hiragana')
 const victim = getQueue('hiragana', 1, 999)[0]
 let suspendedAt = 0
 for (let i = 1; i <= 12 && !suspendedAt; i++) {
@@ -299,6 +349,8 @@ expect('los recuentos concuerdan', desajuste.length / allKanji.length, (v) => v 
   desajuste.length ? `p. ej. ${desajuste[0].k}: ${kanjiStrokes(desajuste[0].k).length} vs ${desajuste[0].s}` : '')
 
 console.log('\nDeshacer')
+setNewPerDay(9999)
+presentAll('katakana')
 const target2 = getQueue('katakana', 1, 999)[0] ?? getQueue('hiragana', 1, 999)[0]
 const before = getCard(target2.cardId)!
 const reviewsBefore = getOverview().totalReviews

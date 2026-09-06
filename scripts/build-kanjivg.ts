@@ -21,7 +21,16 @@ if (!SRC) {
 }
 
 const kanjiList: { k: string }[] = JSON.parse(readFileSync('src/data/kanji.json', 'utf8'))
-const wanted = new Set(kanjiList.map((r) => r.k))
+
+// KanjiVG también trae los kana, así que las lecciones de hiragana y
+// katakana pueden enseñar el trazado igual que las de kanji. Se guardan por
+// carácter suelto: los yōon (きゃ) no existen como entrada combinada, y la
+// interfaz los dibuja componiendo sus dos caracteres.
+const KANA: string[] = []
+for (let c = 0x3041; c <= 0x3096; c++) KANA.push(String.fromCodePoint(c))
+for (let c = 0x30a1; c <= 0x30fa; c++) KANA.push(String.fromCodePoint(c))
+
+const wanted = new Set([...kanjiList.map((r) => r.k), ...KANA])
 
 const xml = readFileSync(join(SRC, 'kanjivg.xml'), 'utf8')
 
@@ -50,9 +59,11 @@ writeFileSync('src/data/kanji-strokes.json', JSON.stringify(strokes))
 
 const covered = Object.keys(strokes).length
 const missing = kanjiList.filter((r) => !strokes[r.k]).map((r) => r.k)
+const kanaCovered = KANA.filter((k) => strokes[k]).length
 const totalPaths = Object.values(strokes).reduce((n, p) => n + p.length, 0)
 
-console.log(`\nkanji con trazado: ${covered} de ${wanted.size}`)
-console.log(`trazos en total: ${totalPaths} (media de ${(totalPaths / covered).toFixed(1)} por kanji)`)
+console.log(`\nkanji con trazado: ${covered - kanaCovered} de ${kanjiList.length}`)
+console.log(`kana con trazado: ${kanaCovered} de ${KANA.length}`)
+console.log(`trazos en total: ${totalPaths} (media de ${(totalPaths / covered).toFixed(1)} por carácter)`)
 console.log(`variantes caligráficas descartadas: ${variants}`)
-if (missing.length) console.log(`sin trazado: ${missing.length} → ${missing.slice(0, 20).join('')}`)
+if (missing.length) console.log(`kanji sin trazado: ${missing.length} → ${missing.slice(0, 20).join('')}`)

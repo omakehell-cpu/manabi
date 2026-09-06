@@ -78,6 +78,28 @@ encontrarlo, no que te digan que no está en el nivel que tienes abierto. Los
 resultados se ordenan por relevancia —coincidencia exacta primero— porque la
 búsqueda por subcadena hacía que «agua» arrastrase 傘, «paraguas».
 
+## Lecciones: primero se enseña, después se pregunta
+
+Nada llega al examen sin haberse presentado antes. Cuando entra material
+nuevo, la sesión abre una tanda de cinco fichas informativas —el carácter, su
+trazado animándose, significados, lecturas con audio y sus palabras de
+ejemplo— y solo después examina esas mismas cinco, repitiéndolas hasta
+acertarlas todas. Luego viene la siguiente tanda.
+
+Sin esto, la primera vez que aparecía un kanji ya era un examen. Eso no medía
+nada: garantizaba un fallo, FSRS lo interpretaba como «esta carta te cuesta»
+y empezaba a calcular con datos falsos, y ese fallo empujaba la carta hacia
+el umbral de las apartadas por un motivo que no era suyo.
+
+Cinco por tanda no es arbitrario: la memoria de trabajo maneja del orden de
+cuatro elementos a la vez, y presentar veinte seguidos reparte la atención
+hasta no dejar nada de ninguno. Es configurable en Progreso.
+
+Los repasos vencidos van siempre antes que las lecciones: son deuda
+contraída. Y durante el examen, una carta recién presentada se marca como
+**nueva**, porque ante algo que acabas de ver no tiene sentido exigirte lo
+mismo que ante un repaso de hace una semana.
+
 ## Ritmo de estudio
 
 Dos mecanismos gobiernan cuánto trabajo hay cada día, y son lo que separa
@@ -117,9 +139,9 @@ el umbral, así que dejarlas no adelanta nada indebido.
 ## Orden de trazos
 
 La ficha de cada kanji anima cómo se escribe, trazo a trazo, con datos de
-KanjiVG: los 2383 caracteres del temario, 25 154 trazos. Se puede reproducir
-entero o avanzar trazo a trazo. Durante el estudio se anima solo al fallar un
-kanji, que es cuando conviene fijarse.
+KanjiVG: los 2383 caracteres del temario y los 176 kana, 25 669 trazos. Se puede reproducir
+entero o avanzar trazo a trazo. Durante el estudio se muestra siempre; en Progreso se
+puede cambiar a que aparezca solo al fallar, o nunca.
 
 Cada trazo lleva `pathLength="1"`, que normaliza su longitud real a la
 unidad: así se anima con un dash-offset sin medir cada curva en el DOM, y

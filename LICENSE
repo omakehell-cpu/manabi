@@ -19,11 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-La licencia MIT cubre el código de esta aplicación, no los datos que
-empaqueta. Los ficheros de src/data/ derivan de fuentes con licencia propia
-—KANJIDIC2 y JMdict del EDRDG, KanjiVG (CC BY-SA 3.0), Tatoeba (CC BY 2.0
-FR)— y se redistribuyen conforme a ella. El detalle está en el README y en
-la pantalla de Créditos de la aplicación.

@@ -675,9 +675,8 @@ electron-builder deriva de ahí el `.icns` y el `.ico`.
 ## Licencias
 
 El código es [MIT](LICENSE). **Los datos no**: los ficheros de `src/data/`
-derivan de fuentes con licencia propia, dos de ellas share-alike, y se
-redistribuyen conforme a ella. Reutilizar este repositorio significa
-heredar esas condiciones, no solo las de MIT.
+derivan de fuentes con licencia propia, dos de ellas share-alike. El
+detalle, fuente por fuente, está en [DATOS.md](DATOS.md).
 
 La atribución que exigen está recogida además en la pantalla **Créditos**
 de la propia aplicación.

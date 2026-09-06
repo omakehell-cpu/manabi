@@ -7,6 +7,7 @@ export type CardType =
   | 'conjugation'
   | 'grammar'
   | 'cloze'
+  | 'writing'
 
 export interface StudyCard {
   cardId: number

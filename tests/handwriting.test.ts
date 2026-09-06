@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { compareHandwriting, compareStroke, resample, type Point } from '../src/lib/handwriting'
+import { guideFor } from '../src/components/Handwriting'
 
 /** Una raya horizontal, como el trazo de 一. */
 const horizontal: Point[] = [
@@ -71,5 +72,37 @@ describe('comparación del carácter completo', () => {
   it('cuenta los trazos que faltan o sobran', () => {
     expect(compareHandwriting([horizontal], modelo).countDelta).toBe(-1)
     expect(compareHandwriting([horizontal, vertical, horizontal], modelo).countDelta).toBe(1)
+  })
+})
+
+describe('andamiaje: la ayuda se retira sola', () => {
+  it('la primera vez se calca sobre el modelo', () => {
+    expect(guideFor(0, 0)).toBe('trace')
+  })
+
+  it('después el modelo queda de fondo', () => {
+    expect(guideFor(1, 1)).toBe('faint')
+    expect(guideFor(2, 2)).toBe('faint')
+  })
+
+  it('luego solo se marca el trazo que toca', () => {
+    expect(guideFor(3, 2)).toBe('stroke')
+    expect(guideFor(5, 2)).toBe('stroke')
+  })
+
+  it('y al final se escribe de memoria', () => {
+    expect(guideFor(6, 2)).toBe('none')
+    expect(guideFor(20, 2)).toBe('none')
+  })
+
+  it('nunca salta de calcar a memoria', () => {
+    // Quitar la ayuda de golpe convierte la práctica en un examen.
+    const orden = ['trace', 'faint', 'stroke', 'none']
+    let anterior = 0
+    for (let reps = 0; reps <= 10; reps++) {
+      const actual = orden.indexOf(guideFor(reps, reps === 0 ? 0 : 2))
+      expect(actual - anterior).toBeLessThanOrEqual(1)
+      anterior = actual
+    }
   })
 })

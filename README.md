@@ -285,9 +285,29 @@ un marcador en ruso en N1, y las dos veces fue el test quien lo encontró.
 
 ## Escritura a mano
 
-Reconocer 鬱 y saber escribirlo son cosas distintas. Desde la ficha de un
-carácter —y desde su lección— se puede dibujar en un lienzo y comprobarlo
-contra el trazado de KanjiVG.
+Reconocer 鬱 y saber escribirlo son cosas distintas. Cada kana y cada kanji
+tienen su carta de escritura, que aparece como **última fase**: primero se
+reconoce el carácter, después se produce desde el rōmaji, y solo entonces se
+traza de memoria.
+
+### La ayuda se retira sola
+
+Se empieza calcando y se acaba escribiendo sin nada delante. El nivel lo
+decide lo trabajada que esté la carta, sin que haya que acordarse de bajarlo:
+
+| Ayuda | Cuándo |
+|---|---|
+| Calcando el modelo | la primera vez |
+| Con el modelo de fondo | las dos siguientes |
+| Solo el trazo que toca | hasta la sexta |
+| De memoria | a partir de ahí |
+
+Retirar la guía de golpe convierte la práctica en un examen, y dejarla
+siempre impide que llegue a memorizarse. El nivel intermedio —marcar solo el
+trazo que toca— dice por dónde seguir sin regalar la forma.
+
+El lienzo también está en la ficha de cualquier carácter, ahí con la guía
+ajustable a mano.
 
 No se compara el parecido del dibujo terminado, sino **cómo se ha hecho**:
 cuántos trazos, en qué orden y en qué dirección. Un carácter dibujado

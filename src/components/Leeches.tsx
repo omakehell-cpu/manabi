@@ -10,6 +10,7 @@ const CARD_LABEL: Record<CardType, string> = {
   conjugation: 'conjugación',
   grammar: 'patrón',
   cloze: 'completar',
+  writing: 'escribir a mano',
 }
 
 /**

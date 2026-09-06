@@ -27,9 +27,42 @@ function pathToPoints(d: string): Point[] {
   return points
 }
 
+/**
+ * Cuánta ayuda se da al escribir.
+ *
+ * La primera vez se calca sobre el modelo; después la guía se va retirando
+ * hasta escribir de memoria. Retirarla de golpe convierte la práctica en un
+ * examen, y dejarla siempre impide que llegue a memorizarse.
+ */
+export type GuideLevel = 'trace' | 'faint' | 'stroke' | 'none'
+
+export const GUIDE_LABEL: Record<GuideLevel, string> = {
+  trace: 'calcando el modelo',
+  faint: 'con el modelo de fondo',
+  stroke: 'solo el trazo que toca',
+  none: 'de memoria',
+}
+
+/**
+ * Con cuánta ayuda toca escribir, según lo trabajada que esté la carta.
+ * El andamiaje se retira solo: no hay que acordarse de bajarlo.
+ */
+export function guideFor(reps: number, state: number): GuideLevel {
+  if (state === 0 || reps === 0) return 'trace'
+  if (reps <= 2) return 'faint'
+  if (reps <= 5) return 'stroke'
+  return 'none'
+}
+
 interface Props {
   glyph: string
   size?: number
+  /** Nivel de ayuda inicial; si se omite, se puede cambiar a mano. */
+  guide?: GuideLevel
+  /** Oculta el botón de guía cuando el nivel lo decide el estudio. */
+  lockGuide?: boolean
+  /** Se avisa del resultado para poder calificar la carta. */
+  onResult?: (result: HandwritingResult) => void
 }
 
 /**
@@ -40,14 +73,24 @@ interface Props {
  * trazos, en qué orden y en qué dirección. Un carácter dibujado empezando
  * por abajo se parece al modelo y está mal escrito.
  */
-export default function Handwriting({ glyph, size = 260 }: Props) {
+export default function Handwriting({
+  glyph,
+  size = 260,
+  guide: initialGuide,
+  lockGuide = false,
+  onResult,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [model, setModel] = useState<Point[][] | null>(null)
   const [strokes, setStrokes] = useState<Point[][]>([])
   const [current, setCurrent] = useState<Point[]>([])
   const [result, setResult] = useState<HandwritingResult | null>(null)
-  const [showGuide, setShowGuide] = useState(true)
+  const [guide, setGuide] = useState<GuideLevel>(initialGuide ?? 'trace')
   const drawing = useRef(false)
+
+  useEffect(() => {
+    setGuide(initialGuide ?? 'trace')
+  }, [initialGuide, glyph])
 
   useEffect(() => {
     setStrokes([])
@@ -91,7 +134,18 @@ export default function Handwriting({ glyph, size = 260 }: Props) {
       ctx.stroke()
     }
 
-    if (showGuide && model) for (const m of model) line(m, 'rgba(255,255,255,0.13)', 9)
+    // El andamiaje: del modelo entero al siguiente trazo, y de ahí a nada.
+    if (model) {
+      if (guide === 'trace') {
+        for (const m of model) line(m, 'rgba(255,255,255,0.22)', 10)
+      } else if (guide === 'faint') {
+        for (const m of model) line(m, 'rgba(255,255,255,0.08)', 9)
+      } else if (guide === 'stroke') {
+        // Solo el que toca ahora: dice por dónde seguir sin regalar la forma.
+        const next = model[strokes.length]
+        if (next) line(next, 'rgba(255,255,255,0.16)', 9)
+      }
+    }
 
     strokes.forEach((s, i) => {
       const verdict = result?.perStroke[i]
@@ -103,7 +157,7 @@ export default function Handwriting({ glyph, size = 260 }: Props) {
       line(s, color === 'var(--ok)' ? '#4ba97a' : color === 'var(--accent)' ? '#e0554f' : color, 9)
     })
     line(current, '#e8ebf0', 9)
-  }, [strokes, current, model, result, showGuide])
+  }, [strokes, current, model, result, guide])
 
   const toModelSpace = useCallback((e: React.PointerEvent<HTMLCanvasElement>): Point => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -140,7 +194,9 @@ export default function Handwriting({ glyph, size = 260 }: Props) {
 
   const check = () => {
     if (!model) return
-    setResult(compareHandwriting(strokes, model))
+    const outcome = compareHandwriting(strokes, model)
+    setResult(outcome)
+    onResult?.(outcome)
   }
 
   const total = model?.length ?? 0
@@ -175,11 +231,25 @@ export default function Handwriting({ glyph, size = 260 }: Props) {
         <Btn onClick={check} disabled={!strokes.length} primary>
           Comprobar
         </Btn>
-        <Btn onClick={() => setShowGuide((g) => !g)}>{showGuide ? 'Ocultar guía' : 'Ver guía'}</Btn>
+        {!lockGuide && (
+          <Btn
+            onClick={() =>
+              setGuide((g) =>
+                g === 'trace' ? 'faint' : g === 'faint' ? 'stroke' : g === 'stroke' ? 'none' : 'trace',
+              )
+            }
+          >
+            {GUIDE_LABEL[guide]}
+          </Btn>
+        )}
         <span className="ml-2 text-xs tabular-nums text-muted">
           {strokes.length} / {total}
         </span>
       </div>
+
+      {lockGuide && (
+        <p className="text-xs text-muted">Escribiendo {GUIDE_LABEL[guide]}</p>
+      )}
 
       {result && <Verdict result={result} total={total} />}
     </div>

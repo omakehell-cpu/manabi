@@ -26,6 +26,7 @@ export type CardType =
   | 'conjugation'
   | 'grammar'
   | 'cloze'
+  | 'writing'
 
 /** Forma de cada registro en src/data/kanji.json (ver scripts/build-kanji.ts). */
 interface KanjiJson {
@@ -297,6 +298,12 @@ function seed(): void {
         if (k.block !== 'extended') {
           insertCard.run({ item_id: itemId, card_type: 'recall', due: now, locked: 1 })
         }
+        // Escribirlo a mano es la última fase: primero se reconoce, después
+        // se produce desde el rōmaji, y solo entonces se traza de memoria.
+        // Los yōon no la llevan: son dos signos ya practicados por separado.
+        if (k.block !== 'yoon' && k.block !== 'extended') {
+          insertCard.run({ item_id: itemId, card_type: 'writing', due: now, locked: 1 })
+        }
       })
     }
 
@@ -538,6 +545,8 @@ function seed(): void {
  *     hasta dominar la ます.
  *  9. En gramática, rellenar el hueco espera a saber qué significa el
  *     patrón, y los niveles avanzan en cadena.
+ * 10. Escribir a mano es la última fase de cada carácter: primero se
+ *     reconoce, después se produce, y solo entonces se traza de memoria.
  */
 export function refreshLocks(): void {
   const unlock = db.prepare('UPDATE card SET locked = 0 WHERE id = ? AND locked = 1')
@@ -634,6 +643,14 @@ export function refreshLocks(): void {
          SELECT c.item_id FROM card c JOIN item i ON i.id = c.item_id
          JOIN deck d ON d.id = i.deck_id
          WHERE d.kind = 'kanji' AND c.card_type = 'meaning' AND c.state >= ?)`,
+    ).run(MATURE)
+
+    // Regla 10 — escribir a mano llega cuando el carácter ya se reconoce.
+    db.prepare(
+      `UPDATE card SET locked = 0
+       WHERE card_type = 'writing' AND locked = 1 AND item_id IN (
+         SELECT c.item_id FROM card c
+         WHERE c.card_type IN ('recall', 'reading') AND c.state >= ?)`,
     ).run(MATURE)
 
     // Regla 9 — usar el patrón espera a reconocerlo.

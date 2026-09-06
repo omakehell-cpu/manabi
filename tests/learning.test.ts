@@ -80,9 +80,10 @@ describe('siembra', () => {
   it('crea las cartas de cada mazo', () => {
     const stats = getDeckStats()
     const by = (slug: string) => stats.find((d) => d.slug === slug)!
-    // 104 kana × 2 cartas; el katakana suma 25 extendidos que no piden evocación.
-    expect(by('hiragana').total).toBe(208)
-    expect(by('katakana').total).toBe(233)
+    // 104 kana: reconocer y evocar cada uno, más escribir a mano los 71 que
+    // no son yōon. El katakana suma 25 extendidos, que no piden evocación.
+    expect(by('hiragana').total).toBe(279)
+    expect(by('katakana').total).toBe(304)
     // 434 palabras generadas desde JMdict, con dos cartas cada una.
     expect(by('vocab').total).toBe(868)
     expect(by('kanji-n5').characters).toBe(79)
@@ -443,6 +444,30 @@ describe('explorador', () => {
   it('refleja el progreso real', () => {
     expect(browseKanji({ level: 5 }).filter((k) => k.progress === 'locked')).toHaveLength(0)
     expect(browseKanji({ level: 1 }).every((k) => k.progress === 'locked')).toBe(true)
+  })
+})
+
+describe('escritura a mano como fase final', () => {
+  it('no aparece hasta poder producir el carácter', () => {
+    const disponible = () =>
+      getQueue('hiragana', 999, 999)
+        .concat(getLessons('hiragana', 999))
+        .filter((c) => c.cardType === 'writing').length
+
+    // Con el reconocimiento asentado todavía no basta: hace falta también
+    // saber escribirlo desde el rōmaji.
+    expect(disponible()).toBe(0)
+
+    drill('hiragana', (c) => c.cardType === 'recall' && c.block === 'gojuon')
+    presentAll('hiragana')
+    expect(disponible()).toBeGreaterThan(0)
+  })
+
+  it('los yōon no la llevan: son dos signos ya practicados aparte', () => {
+    const yoon = getQueue('hiragana', 999, 999)
+      .concat(getLessons('hiragana', 999))
+      .filter((c) => c.cardType === 'writing' && [...c.glyph].length > 1)
+    expect(yoon).toHaveLength(0)
   })
 })
 

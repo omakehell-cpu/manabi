@@ -5,6 +5,7 @@ import { cleanReading } from '../lib/speech'
 import Speaker from './Speaker'
 import StrokeOrder from './StrokeOrder'
 import Components from './Components'
+import Handwriting, { guideFor, type GuideLevel } from './Handwriting'
 import LessonCard from './LessonCard'
 import { strokeVisibility, type StrokeMode } from '../lib/prefs'
 import { FORMS } from '../lib/conjugation'
@@ -48,6 +49,7 @@ interface Prompt {
     note: string
     examples: { jp: string; es: string }[]
   }
+  writing?: { glyph: string; guide: GuideLevel }
 }
 
 function buildPrompt(card: StudyCard): Prompt {
@@ -56,6 +58,21 @@ function buildPrompt(card: StudyCard): Prompt {
     parsed = JSON.parse(card.alt)
   } catch {
     parsed = []
+  }
+
+  if (card.cardType === 'writing') {
+    return {
+      stimulus: card.meaning ?? card.reading,
+      stimulusIsJapanese: false,
+      question: 'Escríbelo a mano',
+      mode: 'meaning',
+      expected: card.glyph,
+      alternatives: [],
+      placeholder: '',
+      // La ayuda se retira sola conforme la carta se trabaja: se empieza
+      // calcando y se acaba escribiendo de memoria.
+      writing: { glyph: card.glyph, guide: guideFor(card.reps, card.state) },
+    }
   }
 
   if (card.deckKind === 'grammar') {
@@ -752,17 +769,63 @@ export default function Study({ deck, deckName, onExit }: Props) {
 
         <div
           key={card.cardId}
-          className={`pop mb-8 ${prompt.stimulusIsJapanese ? 'jp' : 'font-mono'} ${
+          className={`pop mb-8 ${prompt.stimulusIsJapanese ? 'jp' : prompt.writing ? '' : 'font-mono'} ${
             prompt.stimulusIsJapanese
               ? prompt.stimulus.length > 3
                 ? 'text-7xl'
                 : 'text-[9rem] leading-none'
-              : 'text-7xl'
+              : prompt.writing
+                ? 'max-w-lg text-center text-3xl'
+                : 'text-7xl'
           } ${phase === 'wrong' ? 'shake' : ''}`}
         >
           {prompt.stimulus}
         </div>
 
+        {prompt.writing ? (
+          <div className="flex flex-col items-center gap-4">
+            <Handwriting
+              key={card.cardId}
+              glyph={prompt.writing.glyph}
+              size={240}
+              guide={prompt.writing.guide}
+              lockGuide
+              onResult={(r) => {
+                if (answered) return
+                // Bien escrito es acierto; si sobran o faltan trazos, o el
+                // orden falla, cuenta como fallo: eso es justo lo que la
+                // carta comprueba.
+                const ok = r.firstWrong === -1 && r.countDelta === 0
+                setTally((t) =>
+                  ok ? { ...t, right: t.right + 1 } : { ...t, wrong: t.wrong + 1 },
+                )
+                if (ok) {
+                  setPreview({})
+                  setDefaultRating(3)
+                  setPhase('right')
+                  void window.manabi.previewIntervals(card.cardId).then(setPreview)
+                } else {
+                  setPhase('wrong')
+                  history.current.push(1)
+                  void window.manabi.grade(card.cardId, 1, Date.now() - shownAt.current)
+                  setUndoable(true)
+                }
+              }}
+            />
+
+            <div className="flex h-12 items-center justify-center gap-3">
+              {!answered && <span className="text-sm text-muted">Dibuja y pulsa Comprobar</span>}
+              {phase === 'right' && (
+                <>
+                  <Key onClick={() => void commit(2)} label="Costó" hint={formatInterval(preview[2])} />
+                  <Key onClick={() => void commit(3)} label="Bien" hint={formatInterval(preview[3])} primary />
+                  <Key onClick={() => void commit(4)} label="Fácil" hint={formatInterval(preview[4])} />
+                </>
+              )}
+              {phase === 'wrong' && <Key onClick={advance} label="Continuar" hint="Intro" primary />}
+            </div>
+          </div>
+        ) : (
         <div className="w-full max-w-md">
           <input
             ref={inputRef}
@@ -969,6 +1032,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
             {phase === 'wrong' && <Key onClick={advance} label="Continuar" hint="Intro" primary />}
           </div>
         </div>
+        )}
       </main>
     </div>
   )

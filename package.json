@@ -17,7 +17,8 @@
     "data:strokes": "node --max-old-space-size=4096 --experimental-strip-types scripts/build-kanjivg.ts",
     "make:icon": "electron scripts/make-icon.mjs && sips -Z 1024 build/icon.png --out build/icon.png",
     "test": "vitest run --config vitest.config.mts",
-    "test:watch": "vitest --config vitest.config.mts"
+    "test:watch": "vitest --config vitest.config.mts",
+    "data:vocab": "node --max-old-space-size=4096 --experimental-strip-types scripts/build-kana-vocab.ts"
   },
   "dependencies": {
     "@fontsource/noto-sans-jp": "^5.3.0",

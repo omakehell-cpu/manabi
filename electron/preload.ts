@@ -14,6 +14,7 @@ const api = {
   browseKanji: (filters: unknown) => ipcRenderer.invoke('kanji:browse', filters),
   kanjiDetail: (glyph: string) => ipcRenderer.invoke('kanji:detail', glyph),
   kanjiCounts: (level: number) => ipcRenderer.invoke('kanji:counts', level),
+  browseDeck: (slug: string, terms: string[]) => ipcRenderer.invoke('deck:browse', slug, terms),
   leeches: () => ipcRenderer.invoke('leeches:list'),
   reviveLeech: (cardId: number) => ipcRenderer.invoke('leeches:revive', cardId),
   reviveAllLeeches: () => ipcRenderer.invoke('leeches:reviveAll'),

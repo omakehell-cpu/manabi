@@ -16,6 +16,7 @@ import {
   browseKanji,
   kanjiDetail,
   kanjiProgressCounts,
+  browseSimple,
   listLeeches,
   reviveCard,
   reviveAllLeeches,
@@ -77,6 +78,7 @@ app.whenReady().then(() => {
   ipcMain.handle('kanji:browse', (_e, filters: BrowseFilters) => browseKanji(filters))
   ipcMain.handle('kanji:detail', (_e, glyph: string) => kanjiDetail(glyph))
   ipcMain.handle('kanji:counts', (_e, level: number) => kanjiProgressCounts(level))
+  ipcMain.handle('deck:browse', (_e, slug: string, terms: string[]) => browseSimple(slug, terms))
   ipcMain.handle('leeches:list', () => listLeeches())
   ipcMain.handle('leeches:revive', (_e, cardId: number) => reviveCard(cardId))
   ipcMain.handle('leeches:reviveAll', () => reviveAllLeeches())

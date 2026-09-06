@@ -80,7 +80,8 @@ describe('siembra', () => {
     // 104 kana × 2 cartas; el katakana suma 25 extendidos que no piden evocación.
     expect(by('hiragana').total).toBe(208)
     expect(by('katakana').total).toBe(233)
-    expect(by('vocab').total).toBe(180)
+    // 434 palabras generadas desde JMdict, con dos cartas cada una.
+    expect(by('vocab').total).toBe(868)
     expect(by('kanji-n5').characters).toBe(79)
   })
 })

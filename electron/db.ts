@@ -3,7 +3,7 @@ import Database from 'better-sqlite3'
 import schemaSql from './schema.sql?raw'
 import { fsrs, generatorParameters, State, type Card, type Grade } from 'ts-fsrs'
 import { HIRAGANA, KATAKANA } from '../src/data/kana'
-import { VOCAB } from '../src/data/vocab'
+import VOCAB from '../src/data/vocab.json'
 import { tokenizeKana } from '../src/lib/tokenize'
 import KANJI from '../src/data/kanji.json'
 import KANJI_WORDS from '../src/data/kanji-words.json'
@@ -26,6 +26,15 @@ interface KanjiJson {
   g: number
 }
 
+/** Forma de cada registro en src/data/vocab.json. */
+interface KanaVocabJson {
+  w: string
+  r: string
+  m: string
+  a: string[]
+  s: 'hiragana' | 'katakana'
+}
+
 /** Forma de cada registro en src/data/kanji-words.json. */
 interface KanjiWordJson {
   /** La palabra escrita. */
@@ -34,6 +43,8 @@ interface KanjiWordJson {
   r: string
   /** Traducción al español. */
   m: string
+  /** Formas alternativas aceptadas. */
+  a: string[]
   /** Kanji al que pertenece: el último de la palabra en el orden de estudio. */
   k: string
 }
@@ -267,7 +278,7 @@ function seed(): void {
           deck_id: id,
           glyph: w.w,
           reading: w.r,
-          alt: JSON.stringify({ owner: w.k }),
+          alt: JSON.stringify({ owner: w.k, meaning: w.a }),
           meaning: w.m,
           block: 'word',
           row_key: w.k,
@@ -285,19 +296,19 @@ function seed(): void {
     // Vocabulario: reconocimiento (palabra→significado) y lectura (palabra→rōmaji).
     // Ambas nacen bloqueadas hasta dominar los kana que componen la palabra.
     const vid = deckId('vocab')
-    VOCAB.forEach((v, i) => {
+    ;(VOCAB as KanaVocabJson[]).forEach((v, i) => {
       insertItem.run({
         deck_id: vid,
-        glyph: v.glyph,
-        reading: v.reading,
-        alt: JSON.stringify({ reading: v.altReading, meaning: v.altMeaning }),
-        meaning: v.meaning,
-        block: v.script,
-        row_key: v.script,
+        glyph: v.w,
+        reading: v.r,
+        alt: JSON.stringify({ reading: [], meaning: v.a }),
+        meaning: v.m,
+        block: v.s,
+        row_key: v.s,
         position: i,
       })
       const itemId = (
-        db.prepare('SELECT id FROM item WHERE deck_id = ? AND glyph = ?').get(vid, v.glyph) as {
+        db.prepare('SELECT id FROM item WHERE deck_id = ? AND glyph = ?').get(vid, v.w) as {
           id: number
         }
       ).id
@@ -1363,4 +1374,56 @@ export function wordsForKanji(glyph: string): { word: string; reading: string; m
        ORDER BY i.position LIMIT 4`,
     )
     .all(glyph) as { word: string; reading: string; meaning: string }[]
+}
+
+// ------------------------------------- explorador de kana y vocabulario
+
+export interface SimpleBrowseItem {
+  glyph: string
+  reading: string
+  meaning: string | null
+  deck: string
+  block: string
+  progress: KanjiProgress
+  /** Próximo repaso, si ya está en circulación. */
+  nextDue: string | null
+}
+
+/**
+ * Recorre los mazos que no son de kanji. Comparte el resumen de estado con
+ * el explorador de kanji: manda la carta más atrasada, porque saber leer か
+ * no es lo mismo que saber escribirlo.
+ */
+export function browseSimple(slug: string, terms: string[] = []): SimpleBrowseItem[] {
+  const clauses: string[] = []
+  const params: unknown[] = [slug]
+
+  const clean = terms.map((t) => t.trim()).filter(Boolean)
+  if (clean.length) {
+    clauses.push(
+      `(${clean.map(() => '(i.glyph = ? OR i.reading LIKE ? OR i.meaning LIKE ?)').join(' OR ')})`,
+    )
+    for (const t of clean) params.push(t, `%${t}%`, `%${t}%`)
+  }
+
+  const rows = db
+    .prepare(
+      `SELECT i.glyph, i.reading, i.meaning, d.slug AS deck, i.block,
+              MIN(c.locked) AS minLocked, MIN(c.state) AS minState,
+              MIN(CASE WHEN c.locked = 0 THEN c.due END) AS nextDue
+       FROM item i
+       JOIN deck d ON d.id = i.deck_id
+       JOIN card c ON c.item_id = i.id
+       WHERE d.slug = ?${clauses.length ? ` AND ${clauses.join(' AND ')}` : ''}
+       GROUP BY i.id ORDER BY i.position`,
+    )
+    .all(...params) as (Omit<SimpleBrowseItem, 'progress'> & {
+    minLocked: number
+    minState: number
+  })[]
+
+  return rows.map(({ minLocked, minState, ...rest }) => ({
+    ...rest,
+    progress: summarize({ minLocked, minState }),
+  }))
 }

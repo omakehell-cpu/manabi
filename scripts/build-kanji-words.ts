@@ -47,8 +47,10 @@ export interface WordRecord {
   w: string
   /** Su lectura en kana. */
   r: string
-  /** Traducción al español. */
+  /** Traducción al español, sin aclaraciones entre paréntesis. */
   m: string
+  /** Formas alternativas aceptadas, como la glosa completa. */
+  a: string[]
   /** Kanji al que se asigna: el último en el orden de estudio. */
   k: string
 }
@@ -64,6 +66,16 @@ const decodeEntities = (s: string) =>
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
+
+/**
+ * «mayor parte (de algo)» obligaría a teclear el paréntesis para acertar. Se
+ * guarda la forma corta como respuesta y la completa como alternativa.
+ */
+function cleanGloss(gloss: string): { main: string; alt: string[] } {
+  const stripped = gloss.replace(/\([^)]*\)/g, ' ').replace(/\s{2,}/g, ' ').trim()
+  const main = stripped || gloss.trim()
+  return { main, alt: main === gloss.trim() ? [] : [gloss.trim()] }
+}
 
 const isKanji = (ch: string) => {
   const c = ch.codePointAt(0)!
@@ -114,9 +126,12 @@ for (const entry of entries) {
   considered++
 
   // Propietario: el kanji que se aprende más tarde.
+  const { main, alt } = cleanGloss(meaning)
+  if (!main) continue
+
   const owner = kanjiIn.reduce((a, b) => (order.get(a)! >= order.get(b)! ? a : b))
   const list = candidates.get(owner) ?? []
-  list.push({ w: written, r: pronounced, m: meaning, k: owner })
+  list.push({ w: written, r: pronounced, m: main, a: alt, k: owner })
   candidates.set(owner, list)
 }
 

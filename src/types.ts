@@ -68,6 +68,16 @@ export interface KanjiDetail extends KanjiBrowseItem {
   words: { word: string; reading: string; meaning: string; progress: KanjiProgress }[]
 }
 
+export interface SimpleBrowseItem {
+  glyph: string
+  reading: string
+  meaning: string | null
+  deck: string
+  block: string
+  progress: KanjiProgress
+  nextDue: string | null
+}
+
 export interface BrowseFilters {
   level?: number
   progress?: KanjiProgress | 'all'
@@ -113,6 +123,7 @@ export interface ManabiApi {
   browseKanji(filters: BrowseFilters): Promise<KanjiBrowseItem[]>
   kanjiDetail(glyph: string): Promise<KanjiDetail | null>
   kanjiCounts(level: number): Promise<Record<KanjiProgress, number>>
+  browseDeck(slug: string, terms: string[]): Promise<SimpleBrowseItem[]>
   leeches(): Promise<LeechCard[]>
   reviveLeech(cardId: number): Promise<void>
   reviveAllLeeches(): Promise<number>

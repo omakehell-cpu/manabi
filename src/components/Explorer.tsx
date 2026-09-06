@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toHiragana, toKatakana } from 'wanakana'
-import type { KanjiBrowseItem, KanjiDetail, KanjiProgress } from '../types'
+import type { KanjiBrowseItem, KanjiDetail, KanjiProgress, SimpleBrowseItem } from '../types'
 import { cleanReading } from '../lib/speech'
 import Speaker from './Speaker'
 import StrokeOrder from './StrokeOrder'
@@ -38,11 +38,23 @@ function searchTerms(query: string): string[] {
   return [...terms]
 }
 
+/** Mazos que se pueden recorrer, con el nombre que se ve en el selector. */
+const SCOPES = [
+  { id: 'kanji', label: 'Kanji' },
+  { id: 'hiragana', label: 'Hiragana' },
+  { id: 'katakana', label: 'Katakana' },
+  { id: 'vocab', label: 'Vocabulario' },
+] as const
+
+type Scope = (typeof SCOPES)[number]['id']
+
 export default function Explorer() {
+  const [scope, setScope] = useState<Scope>('kanji')
   const [level, setLevel] = useState<number>(5)
   const [progress, setProgress] = useState<KanjiProgress | 'all'>('all')
   const [query, setQuery] = useState('')
   const [items, setItems] = useState<KanjiBrowseItem[] | null>(null)
+  const [simple, setSimple] = useState<SimpleBrowseItem[] | null>(null)
   const [selected, setSelected] = useState<KanjiDetail | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -50,16 +62,22 @@ export default function Explorer() {
 
   useEffect(() => {
     let alive = true
-    // Al buscar se ignora el nivel: si escribes 水 quieres encontrarlo,
-    // no que te digan que no está en el nivel abierto.
-    const filters = terms.length ? { terms, progress } : { level, progress }
-    void window.manabi.browseKanji(filters).then((r) => {
-      if (alive) setItems(r)
-    })
+    if (scope === 'kanji') {
+      // Al buscar se ignora el nivel: si escribes 水 quieres encontrarlo,
+      // no que te digan que no está en el nivel abierto.
+      const filters = terms.length ? { terms, progress } : { level, progress }
+      void window.manabi.browseKanji(filters).then((r) => {
+        if (alive) setItems(r)
+      })
+    } else {
+      void window.manabi.browseDeck(scope, terms).then((r) => {
+        if (alive) setSimple(progress === 'all' ? r : r.filter((k) => k.progress === progress))
+      })
+    }
     return () => {
       alive = false
     }
-  }, [level, progress, terms])
+  }, [scope, level, progress, terms])
 
   const open = useCallback((glyph: string) => {
     void window.manabi.kanjiDetail(glyph).then(setSelected)
@@ -78,32 +96,52 @@ export default function Explorer() {
     return () => window.removeEventListener('keydown', onKey)
   }, [selected])
 
+  const shown = scope === 'kanji' ? items : simple
   const counts = useMemo(() => {
     const out: Record<string, number> = { locked: 0, new: 0, learning: 0, mature: 0 }
-    for (const k of items ?? []) out[k.progress]++
+    for (const k of shown ?? []) out[k.progress]++
     return out
-  }, [items])
+  }, [shown])
 
   return (
     <div className="mx-auto w-full max-w-4xl px-8 py-6">
       <h1 className="text-2xl font-medium">Explorar</h1>
       <p className="mt-1 text-sm text-muted">
-        Los 2383 kanji del temario, se hayan estudiado o no.
+        Todo el temario, se haya estudiado o no.
       </p>
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-5 flex flex-wrap gap-1">
+        {SCOPES.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => {
+              setScope(s.id)
+              setQuery('')
+            }}
+            className={`rounded-lg px-3.5 py-1.5 text-sm transition-colors ${
+              scope === s.id ? 'bg-raised text-fg' : 'text-muted hover:text-fg'
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
         <input
           ref={searchRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           spellCheck={false}
-          placeholder="Busca 水, «agua» o «sui»…"
+          placeholder={
+            scope === 'kanji' ? 'Busca 水, «agua» o «sui»…' : 'Busca un signo, su lectura o su significado…'
+          }
           className="min-w-56 flex-1 rounded-lg border border-line bg-surface px-4 py-2.5 text-sm outline-none placeholder:text-muted/60 focus:border-muted"
         />
         <select
           value={level}
           onChange={(e) => setLevel(Number(e.target.value))}
-          disabled={terms.length > 0}
+          disabled={terms.length > 0 || scope !== 'kanji'}
           className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm outline-none focus:border-muted disabled:opacity-40"
         >
           {LEVELS.map((n) => (
@@ -126,9 +164,11 @@ export default function Explorer() {
         </select>
       </div>
 
-      {items && items.length > 0 && (
+      {shown && shown.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
-          <span>{items.length} kanji</span>
+          <span>
+            {shown.length} {scope === 'vocab' ? 'palabras' : scope === 'kanji' ? 'kanji' : 'signos'}
+          </span>
           {(Object.keys(PROGRESS_LABEL) as KanjiProgress[])
             .filter((p) => counts[p] > 0)
             .map((p) => (
@@ -140,17 +180,17 @@ export default function Explorer() {
         </div>
       )}
 
-      {!items ? (
+      {!shown ? (
         <p className="mt-10 text-sm text-muted">Cargando…</p>
-      ) : items.length === 0 ? (
+      ) : shown.length === 0 ? (
         <p className="mt-10 text-sm text-muted">
           {terms.length
             ? `Nada coincide con «${query}». Prueba con el carácter, un significado en español o una lectura.`
-            : 'No hay kanji con ese filtro.'}
+            : 'Nada con ese filtro.'}
         </p>
-      ) : (
+      ) : scope === 'kanji' ? (
         <div className="mt-5 grid grid-cols-[repeat(auto-fill,minmax(3rem,1fr))] gap-1.5">
-          {items.map((k) => (
+          {(shown as KanjiBrowseItem[]).map((k) => (
             <button
               key={k.glyph}
               onClick={() => open(k.glyph)}
@@ -161,6 +201,28 @@ export default function Explorer() {
             </button>
           ))}
         </div>
+      ) : (
+        // Los kana y las palabras se leen en fila: lo que importa aquí es la
+        // pareja signo–lectura, no reconocer una forma de un vistazo.
+        <ul className="mt-5 grid gap-1.5 sm:grid-cols-2">
+          {(shown as SimpleBrowseItem[]).map((k) => (
+            <li
+              key={k.glyph}
+              className={`flex items-baseline gap-3 rounded-lg bg-surface px-4 py-2.5 ${
+                k.progress === 'locked' ? 'opacity-50' : ''
+              }`}
+            >
+              <span className={`jp text-2xl ${PROGRESS_STYLE[k.progress].split(' ')[0]}`}>
+                {k.glyph}
+              </span>
+              <span className="font-mono text-sm text-muted">{k.reading}</span>
+              {k.meaning && (
+                <span className="ml-auto truncate text-right text-sm text-muted">{k.meaning}</span>
+              )}
+              <Speaker text={k.glyph} />
+            </li>
+          ))}
+        </ul>
       )}
 
       {selected && <DetailPanel detail={selected} onClose={() => setSelected(null)} />}

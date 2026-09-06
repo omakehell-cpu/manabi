@@ -9,7 +9,7 @@ Funciona sin conexión: todo el progreso vive en una base SQLite local.
 |---|---|
 | **Hiragana** | 104 signos: 46 gojūon + 25 dakuten/handakuten + 33 yōon |
 | **Katakana** | los mismos 104 + 25 extendidos (ファ, ヴィ, ティ…) |
-| **Vocabulario en kana** | 90 palabras escritas solo en kana, sin kanji |
+| **Vocabulario en kana** | 434 palabras leídas en kana, generadas desde JMdict |
 | **Kanji N5 → N1** | 2383 caracteres con 4476 palabras de ejemplo |
 
 ### Los cinco niveles
@@ -67,6 +67,10 @@ pregunte: los 2383 kanji en una rejilla, coloreados según su estado (sin
 abrir, por empezar, aprendiendo, asentado). Al pulsar uno se abre su ficha
 con significados, lecturas con audio, trazos, puesto por frecuencia en
 prensa, cuándo vuelve a tocar y sus palabras de ejemplo.
+
+Cubre los cuatro mazos: los kanji en rejilla y los kana y el vocabulario en
+lista, donde lo que importa es la pareja signo–lectura y no reconocer una
+forma de un vistazo.
 
 El buscador acepta las tres formas en que uno recuerda un kanji: el carácter
 (`水`), un significado en español (`agua`) o una lectura, escrita en rōmaji

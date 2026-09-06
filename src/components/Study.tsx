@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { StudyCard } from '../types'
-import { checkAnswer, toTargetKana, type CheckMode } from '../lib/answer'
+import { checkAnswer, maskAnswer, toTargetKana, type CheckMode } from '../lib/answer'
 import { cleanReading } from '../lib/speech'
 import Speaker from './Speaker'
 import StrokeOrder from './StrokeOrder'
@@ -143,7 +143,15 @@ function buildPrompt(card: StudyCard): Prompt {
   }
 }
 
-type Phase = 'asking' | 'right' | 'wrong'
+/**
+ * `retry` es el segundo intento: se ha fallado una vez pero no se revela la
+ * respuesta todavía. No se acepta nada incorrecto —el que responde se
+ * corrige solo—, así que no relaja la exigencia; lo que evita es que un
+ * desliz de tecleo se registre como un fallo de memoria.
+ */
+type Phase = 'asking' | 'retry' | 'right' | 'wrong'
+
+
 
 interface Props {
   deck: string
@@ -167,6 +175,8 @@ export default function Study({ deck, deckName, onExit }: Props) {
   const [tally, setTally] = useState({ right: 0, wrong: 0 })
   const [done, setDone] = useState(0)
   const [justSuspended, setJustSuspended] = useState(false)
+  /** Lo tecleado en el intento fallido, para poder enseñárselo al corregir. */
+  const [firstTry, setFirstTry] = useState('')
   /** Tanda que se está presentando; vacía mientras se examina. */
   const [lesson, setLesson] = useState<StudyCard[]>([])
   const [lessonAt, setLessonAt] = useState(0)
@@ -298,6 +308,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
   const advance = useCallback(() => {
     setPhase('asking')
     setValue('')
+    setFirstTry('')
     setJustSuspended(false)
     setDone((d) => d + 1)
 
@@ -325,24 +336,39 @@ export default function Study({ deck, deckName, onExit }: Props) {
   }, [queue, index, refill, batch, phase, openLessons])
 
   const submit = useCallback(async () => {
-    if (!card || !prompt || phase !== 'asking' || !value.trim()) return
+    if (!card || !prompt || !value.trim()) return
+    if (phase !== 'asking' && phase !== 'retry') return
+
     const result = checkAnswer(value, prompt.expected, prompt.alternatives, prompt.mode)
     const elapsed = Date.now() - shownAt.current
+    const second = phase === 'retry'
 
     if (result.correct) {
       setPhase('right')
       setTally((t) => ({ ...t, right: t.right + 1 }))
-      history.current.push(3)
-      await window.manabi.grade(card.cardId, 3, elapsed)
-    } else {
-      setPhase('wrong')
-      setTally((t) => ({ ...t, wrong: t.wrong + 1 }))
-      history.current.push(1)
-      const outcome = await window.manabi.grade(card.cardId, 1, elapsed)
-      // Apartarla en silencio dejaba al usuario sin saber que había dejado
-      // de ver algo; se avisa aquí y queda listada en Progreso.
-      setJustSuspended(outcome.suspended)
+      // Acertar al segundo intento no es lo mismo que acertar a la primera:
+      // se registra como «costó», que es lo que de verdad ha pasado.
+      const rating = second ? 2 : 3
+      history.current.push(rating)
+      await window.manabi.grade(card.cardId, rating, elapsed)
+      return
     }
+
+    if (!second) {
+      // Primer fallo: ni se califica ni se revela la respuesta todavía.
+      setFirstTry(value)
+      setPhase('retry')
+      setValue('')
+      return
+    }
+
+    setPhase('wrong')
+    setTally((t) => ({ ...t, wrong: t.wrong + 1 }))
+    history.current.push(1)
+    const outcome = await window.manabi.grade(card.cardId, 1, elapsed)
+    // Apartarla en silencio dejaba al usuario sin saber que había dejado
+    // de ver algo; se avisa aquí y queda listada en Progreso.
+    setJustSuspended(outcome.suspended)
   }, [card, prompt, phase, value])
 
   /** Recalifica un acierto con una nota distinta (Difícil / Fácil). */
@@ -380,6 +406,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
     setExhausted(null)
     setPhase('asking')
     setValue('')
+    setFirstTry('')
     setJustSuspended(false)
     if (restored) {
       setQueue((q) => {
@@ -404,7 +431,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
       if (e.key === 'Enter') {
         e.preventDefault()
         if (lesson.length) return void advanceLesson()
-        return phase === 'asking' ? void submit() : advance()
+        return phase === 'asking' || phase === 'retry' ? void submit() : advance()
       }
       if (phase === 'right') {
         if (e.key === '2') return void regrade(2)
@@ -529,7 +556,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
     )
   }
 
-  const answered = phase !== 'asking'
+  const answered = phase === 'right' || phase === 'wrong'
   const progress = batch ? 0 : (index / queue.length) * 100
 
   return (
@@ -597,12 +624,56 @@ export default function Study({ deck, deckName, onExit }: Props) {
                 ? 'border-ok text-ok'
                 : phase === 'wrong'
                   ? 'border-accent text-accent'
-                  : 'border-line focus:border-muted'
+                  : phase === 'retry'
+                    ? 'border-warn focus:border-warn'
+                    : 'border-line focus:border-muted'
             }`}
           />
 
           {livePreview && !answered && (
             <p className="jp mt-3 text-center text-3xl text-muted">{livePreview}</p>
+          )}
+
+          {phase === 'retry' && (
+            <div className="mt-5 rounded-xl border border-warn/40 px-5 py-4 text-center">
+              <p className="text-sm text-warn">
+                {firstTry ? (
+                  <>
+                    «<span className="jp">{firstTry}</span>» no es. Te queda un intento.
+                  </>
+                ) : (
+                  'No es. Te queda un intento.'
+                )}
+              </p>
+
+              {/* En rōmaji→kana la respuesta es un solo signo: enmascararlo no
+                  diría nada, así que la pista es su primer trazo. */}
+              {prompt.mode === 'kana' && [...prompt.expected].length === 1 ? (
+                <div className="mt-3 flex justify-center">
+                  <StrokeOrder glyph={prompt.expected} size={96} initialStrokes={1} bare />
+                </div>
+              ) : maskAnswer(prompt.expected) ? (
+                <p
+                  className={`mt-2 font-mono text-2xl tracking-widest text-muted ${
+                    prompt.mode === 'reading' || prompt.mode === 'kana' ? 'jp' : ''
+                  }`}
+                >
+                  {maskAnswer(prompt.expected)}
+                </p>
+              ) : (
+                // Una respuesta de un solo carácter no se puede enmascarar
+                // sin resolverla; decir que es corta ya descarta casi todo.
+                <p className="mt-2 text-sm text-muted">
+                  {prompt.mode === 'meaning' ? 'una sola palabra corta' : 'un solo carácter'}
+                </p>
+              )}
+
+              {prompt.mode === 'meaning' && prompt.alternatives.length > 1 && (
+                <p className="mt-2 text-xs text-muted">
+                  se aceptan {prompt.alternatives.length} significados distintos
+                </p>
+              )}
+            </div>
           )}
 
           {phase === 'wrong' && !prompt.kanji && !prompt.word && (
@@ -662,7 +733,11 @@ export default function Study({ deck, deckName, onExit }: Props) {
           )}
 
           <div className="mt-6 flex h-12 items-center justify-center gap-3">
-            {!answered && <span className="text-sm text-muted">Intro para responder</span>}
+            {!answered && (
+              <span className="text-sm text-muted">
+                {phase === 'retry' ? 'Corrige y pulsa Intro' : 'Intro para responder'}
+              </span>
+            )}
             {phase === 'right' && (
               <>
                 <Key onClick={() => void regrade(2)} label="Costó" hint="2" />

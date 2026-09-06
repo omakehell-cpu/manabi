@@ -5,6 +5,7 @@
  * Se ejecuta con `npm run check`, sin abrir Electron.
  */
 import { readFileSync, rmSync } from 'node:fs'
+import { checkAnswer, maskAnswer } from '../src/lib/answer'
 import {
   openDatabase,
   getQueue,
@@ -379,6 +380,37 @@ expect('la carta se apartó', hitLimit, (v) => v === true, '')
 expect('y figura como apartada', listLeeches().some((l) => l.cardId === victim2.cardId), (v) => v === true, '')
 undoLastReview()
 expect('deshacer retira la suspensión', listLeeches().some((l) => l.cardId === victim2.cardId), (v) => v === false, 'la carta debía volver a circular')
+
+console.log('\nPista del segundo intento')
+expect('enmascara dejando la inicial', maskAnswer('día'), (v) => v === 'd · ·', '')
+expect('distingue este de oeste', maskAnswer('este') !== maskAnswer('oeste'), (v) => v === true,
+  'la longitud tiene que diferenciarlos')
+expect('respeta los espacios', maskAnswer('rayo de sol'), (v) => v === 'r · · ·   · ·   · · ·', '')
+expect('no enmascara lo de un carácter', maskAnswer('a'), (v) => v === '', 'lo destaparía entero')
+
+// La pista orienta, pero no puede resolver: muchos kanji del mismo nivel
+// comparten máscara, así que sigue haciendo falta recordar cuál es.
+const n5meanings = (JSON.parse(readFileSync('src/data/kanji.json', 'utf8')) as { l: number; k: string; m: string[] }[])
+  .filter((r) => r.l === 5)
+const masks = new Map<string, Set<string>>()
+for (const r of n5meanings) {
+  for (const m of r.m) {
+    const key = maskAnswer(m)
+    if (!key) continue
+    if (!masks.has(key)) masks.set(key, new Set())
+    masks.get(key)!.add(r.k)
+  }
+}
+const compartidas = [...masks.values()].filter((s) => s.size > 1).length
+expect('la pista no resuelve la carta', compartidas, (v) => v > 10,
+  'demasiadas máscaras únicas: la pista estaría dando la respuesta')
+console.log(`  ${compartidas} máscaras de N5 las comparten varios kanji`)
+
+// La corrección tras el fallo tiene que aceptarse igual que un acierto limpio.
+expect('el reintento acepta la respuesta buena',
+  checkAnswer('dia', 'día', ['día', 'sol'], 'meaning').correct, (v) => v === true, '')
+expect('y sigue rechazando la mala',
+  checkAnswer('noche', 'día', ['día', 'sol'], 'meaning').correct, (v) => v === false, '')
 
 console.log(failures === 0 ? '\nTodo correcto\n' : `\n${failures} comprobación(es) fallida(s)\n`)
 process.exit(failures === 0 ? 0 : 1)

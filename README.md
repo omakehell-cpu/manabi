@@ -100,6 +100,32 @@ contraída. Y durante el examen, una carta recién presentada se marca como
 **nueva**, porque ante algo que acabas de ver no tiene sentido exigirte lo
 mismo que ante un repaso de hace una semana.
 
+## Un reintento por carta
+
+Fallar una vez no da la carta por fallada. El primer error no se califica ni
+revela la respuesta: avisa, da una pista y deja corregir. Si se acierta en el
+segundo intento se registra **Difícil** —se recordaba, pero costó—; si se
+falla otra vez, entonces sí cuenta como fallo.
+
+Lo que esto evita es que un desliz de tecleo se registre como un fallo de
+memoria, ensucie el cálculo de FSRS y empuje la carta hacia el umbral de las
+apartadas.
+
+La pista es la primera letra y la longitud del resto: `día` se muestra como
+`d · ·`. Es deliberadamente parca. En el temario hay **1246 pares de
+significados separados por una sola letra** dentro del mismo nivel —東
+«este» y 西 «oeste», entre ellos—, así que una pista generosa resolvería la
+carta en lugar de ayudar a recordarla; 51 máscaras de N5 las comparten varios
+kanji.
+
+Por eso mismo **no se aceptan respuestas «casi correctas»**: perdonar un
+carácter de diferencia daría por buena «oeste» cuando la respuesta es
+«este». El reintento es seguro porque nunca acepta nada incorrecto — quien
+responde se corrige solo.
+
+En rōmaji→kana la respuesta es un único signo y enmascararla no diría nada:
+ahí la pista es su primer trazo.
+
 ## Ritmo de estudio
 
 Dos mecanismos gobiernan cuánto trabajo hay cada día, y son lo que separa

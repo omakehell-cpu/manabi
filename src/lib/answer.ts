@@ -81,3 +81,18 @@ export function toTargetKana(raw: string, target: string): string {
   const trimmed = raw.trim()
   return /[ァ-ヶ]/.test(target) ? toKatakana(trimmed) : toKana(trimmed)
 }
+
+/**
+ * Pista para el segundo intento: la primera letra y la longitud del resto.
+ *
+ * Es deliberadamente parca. En el temario hay 1246 pares de significados
+ * separados por una sola letra —東 «este» y 西 «oeste», entre ellos—, así que
+ * una pista generosa resolvería la carta en lugar de ayudar a recordarla.
+ * Devuelve cadena vacía para respuestas de un solo carácter: ahí cualquier
+ * máscara la destaparía entera.
+ */
+export function maskAnswer(answer: string): string {
+  const chars = [...answer.trim()]
+  if (chars.length <= 1) return ''
+  return chars[0] + ' ' + chars.slice(1).map((c) => (c === ' ' ? ' ' : '·')).join(' ')
+}

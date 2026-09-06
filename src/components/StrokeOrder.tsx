@@ -10,6 +10,10 @@ interface Props {
   size?: number
   /** Empezar a dibujar en cuanto aparece. */
   autoPlay?: boolean
+  /** Trazos ya visibles al aparecer. Se usa para dar una pista parcial. */
+  initialStrokes?: number
+  /** Ocultar los controles: como pista solo interesa la forma. */
+  bare?: boolean
 }
 
 /**
@@ -20,7 +24,13 @@ interface Props {
  * curva con getTotalLength(), y todos los trazos tardan lo mismo
  * independientemente de su tamaño.
  */
-export default function StrokeOrder({ glyph, size = 200, autoPlay = false }: Props) {
+export default function StrokeOrder({
+  glyph,
+  size = 200,
+  autoPlay = false,
+  initialStrokes = 0,
+  bare = false,
+}: Props) {
   const [paths, setPaths] = useState<string[] | null>(null)
   /** Trazos ya terminados. */
   const [drawn, setDrawn] = useState(0)
@@ -40,13 +50,15 @@ export default function StrokeOrder({ glyph, size = 200, autoPlay = false }: Pro
     setDrawn(0)
     stop()
     void window.manabi.kanjiStrokes(glyph).then((p) => {
-      if (alive) setPaths(p)
+      if (!alive) return
+      setPaths(p)
+      if (initialStrokes) setDrawn(Math.min(initialStrokes, p.length))
     })
     return () => {
       alive = false
       stop()
     }
-  }, [glyph, stop])
+  }, [glyph, stop, initialStrokes])
 
   const play = useCallback(
     (from = 0) => {
@@ -137,6 +149,7 @@ export default function StrokeOrder({ glyph, size = 200, autoPlay = false }: Pro
         })}
       </svg>
 
+      {bare ? null : (
       <div className="flex items-center gap-1.5">
         <Ctrl onClick={() => step(-1)} disabled={drawn === 0 && drawing < 0} label="Trazo anterior">
           ‹
@@ -154,6 +167,7 @@ export default function StrokeOrder({ glyph, size = 200, autoPlay = false }: Pro
           {Math.min(shown + (drawing >= 0 ? 1 : 0), total) || drawn} / {total}
         </span>
       </div>
+      )}
     </div>
   )
 }

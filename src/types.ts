@@ -1,4 +1,12 @@
-export type CardType = 'recognition' | 'recall' | 'reading' | 'meaning' | 'word'
+export type CardType =
+  | 'recognition'
+  | 'recall'
+  | 'reading'
+  | 'meaning'
+  | 'word'
+  | 'conjugation'
+  | 'grammar'
+  | 'cloze'
 
 export interface StudyCard {
   cardId: number

@@ -13,6 +13,7 @@ Funciona sin conexión: todo el progreso vive en una base SQLite local.
 | **Kanji N5 → N1** | 2383 caracteres con 5443 palabras de ejemplo |
 | **Vocabulario N5 → N1** | 7057 palabras del JLPT, en cinco niveles |
 | **Conjugación** | 7 formas de verbos y adjetivos, 654 fichas |
+| **Gramática N5 → N3** | partículas y estructuras, escritas para la app |
 
 ### Los cinco niveles
 
@@ -247,6 +248,21 @@ todo las excepciones, que es donde todo el mundo falla:
 
 Se responde en kana, no en kanji: exigir el kanji obligaría a tener un IME
 instalado.
+
+## Gramática
+
+Un temario escrito para esta aplicación, porque **no existe** un conjunto de
+datos abierto de puntos gramaticales del JLPT con licencia clara: solo listas
+en webs de estudio, sin permiso de reutilización.
+
+Cada punto trae el patrón, cómo se construye, para qué sirve —incluida la
+confusión típica con la que se parece— y ejemplos con su traducción. De ahí
+salen dos cartas: una pregunta qué significa el patrón y la otra lo borra de
+una frase para que haya que reponerlo. La segunda es la que enseña a usarlo;
+la primera, a reconocerlo, y por eso rellenar el hueco espera a haber
+aprendido el significado.
+
+Estado: **N5, N4 y N3 escritos**; N2 y N1 pendientes.
 
 ## Escritura a mano
 

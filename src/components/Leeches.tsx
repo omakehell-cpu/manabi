@@ -7,6 +7,9 @@ const CARD_LABEL: Record<CardType, string> = {
   reading: 'lectura',
   meaning: 'significado',
   word: 'palabra',
+  conjugation: 'conjugación',
+  grammar: 'patrón',
+  cloze: 'completar',
 }
 
 /**

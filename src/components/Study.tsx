@@ -39,6 +39,13 @@ interface Prompt {
     answerKana: string
     hint: string
   }
+  grammar?: {
+    pattern: string
+    meaning: string
+    form: string
+    note: string
+    examples: { jp: string; es: string }[]
+  }
 }
 
 function buildPrompt(card: StudyCard): Prompt {
@@ -47,6 +54,51 @@ function buildPrompt(card: StudyCard): Prompt {
     parsed = JSON.parse(card.alt)
   } catch {
     parsed = []
+  }
+
+  if (card.deckKind === 'grammar') {
+    const g = parsed as {
+      meaning: string[]
+      form: string
+      note: string
+      examples: { jp: string; es: string }[]
+      cloze: string
+      clozeAnswer: string
+      clozeEs: string
+    }
+    const detail = {
+      form: g.form,
+      note: g.note,
+      examples: g.examples ?? [],
+      pattern: card.glyph,
+      meaning: card.meaning ?? '',
+    }
+
+    if (card.cardType === 'cloze') {
+      return {
+        stimulus: g.cloze,
+        stimulusIsJapanese: true,
+        question: `Completa la frase · ${g.clozeEs}`,
+        // Se responde en kana: el patrón puede llevar kanji, pero exigirlo
+        // obligaría a tener un IME.
+        mode: 'reading',
+        expected: g.clozeAnswer,
+        alternatives: [g.clozeAnswer],
+        placeholder: 'teclea en rōmaji',
+        grammar: detail,
+      }
+    }
+
+    return {
+      stimulus: card.glyph,
+      stimulusIsJapanese: true,
+      question: '¿Qué expresa este patrón?',
+      mode: 'meaning',
+      expected: card.meaning ?? '',
+      alternatives: g.meaning ?? [],
+      placeholder: 'en español',
+      grammar: detail,
+    }
   }
 
   if (card.deckKind === 'conjugation') {
@@ -775,7 +827,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
             </div>
           )}
 
-          {phase === 'wrong' && !prompt.kanji && !prompt.word && (
+          {phase === 'wrong' && !prompt.kanji && !prompt.word && !prompt.grammar && (
             <div className="mt-5 rounded-xl bg-accent-soft px-5 py-4 text-center">
               <p className="text-xs tracking-wide text-muted uppercase">Respuesta</p>
               <div className="mt-1 flex items-center justify-center gap-2">
@@ -800,7 +852,7 @@ export default function Study({ deck, deckName, onExit }: Props) {
 
           {/* Las cartas de conjugación tienen su propio panel: aquí saldría
               «新しい|masu», que es la clave interna del ítem. */}
-          {phase === 'right' && prompt.audio && !prompt.word && !prompt.conjugation && (
+          {phase === 'right' && prompt.audio && !prompt.word && !prompt.conjugation && !prompt.grammar && (
             <div className="mt-4 flex items-center justify-center gap-2 text-muted">
               <span className="jp text-2xl text-fg">{card.glyph}</span>
               <Speaker text={prompt.audio} size="md" />
@@ -816,6 +868,32 @@ export default function Study({ deck, deckName, onExit }: Props) {
                 strokeMode === 'always' || (strokeMode === 'onError' && phase === 'wrong')
               }
             />
+          )}
+
+          {answered && prompt.grammar && (
+            <div
+              className={`mt-5 rounded-xl px-5 py-4 ${
+                phase === 'wrong' ? 'bg-accent-soft' : 'border border-line bg-surface'
+              }`}
+            >
+              <p className="text-center">
+                <span className="jp text-2xl">{prompt.grammar.pattern}</span>
+                <span className="ml-2 text-muted">{prompt.grammar.meaning}</span>
+              </p>
+              <p className="mt-3 text-center text-xs tracking-wide text-muted uppercase">
+                {prompt.grammar.form}
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-muted">{prompt.grammar.note}</p>
+              <ul className="mt-4 space-y-2">
+                {prompt.grammar.examples.map((e) => (
+                  <li key={e.jp} className="text-sm">
+                    <span className="jp text-base">{e.jp}</span>
+                    <Speaker text={e.jp} />
+                    <span className="ml-1 text-muted">{e.es}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {answered && prompt.conjugation && (

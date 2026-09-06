@@ -76,6 +76,14 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
           cls: string
         })
       : null
+  const gram =
+    card.deckKind === 'grammar'
+      ? (alt as {
+          form: string
+          note: string
+          examples: { jp: string; es: string }[]
+        })
+      : null
   const isCharacter = card.deckKind === 'hiragana' || card.deckKind === 'katakana' || isKanji
   const strokeChars = isCharacter ? [...card.glyph] : []
 
@@ -87,6 +95,23 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
 
       {writing ? (
         <Handwriting glyph={strokeChars[0]} size={230} />
+      ) : gram ? (
+        <div className="flex max-w-xl flex-col items-center gap-3 text-center">
+          <p className="jp text-5xl">{card.glyph}</p>
+          <p className="font-mono text-sm text-muted">{card.reading}</p>
+          <p className="mt-2 text-xl">{card.meaning}</p>
+          <p className="mt-3 text-xs tracking-wide text-muted uppercase">{gram.form}</p>
+          <p className="mt-2 text-sm leading-relaxed text-muted">{gram.note}</p>
+          <ul className="mt-4 w-full space-y-2 text-left">
+            {gram.examples.map((e) => (
+              <li key={e.jp} className="rounded-lg bg-surface px-4 py-2.5 text-sm">
+                <span className="jp text-base">{e.jp}</span>
+                <Speaker text={e.jp} />
+                <p className="mt-0.5 text-muted">{e.es}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : conj ? (
         <div className="flex flex-col items-center gap-3 text-center">
           <p className="jp text-5xl">{conj.word}</p>

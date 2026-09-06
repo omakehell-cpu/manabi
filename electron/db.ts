@@ -13,8 +13,17 @@ import KANJI_STROKES from '../src/data/kanji-strokes.json'
 import SENTENCES from '../src/data/sentences.json'
 import VOCABULARY from '../src/data/vocabulary.json'
 import CONJUGATION from '../src/data/conjugation.json'
+import { GRAMMAR, answerOf, blanked, plain } from '../src/data/grammar'
 
-export type CardType = 'recognition' | 'recall' | 'reading' | 'meaning' | 'word' | 'conjugation'
+export type CardType =
+  | 'recognition'
+  | 'recall'
+  | 'reading'
+  | 'meaning'
+  | 'word'
+  | 'conjugation'
+  | 'grammar'
+  | 'cloze'
 
 /** Forma de cada registro en src/data/kanji.json (ver scripts/build-kanji.ts). */
 interface KanjiJson {
@@ -219,6 +228,12 @@ const DECKS = [
     position: 8 + i,
   })),
   { kind: 'conjugation', slug: 'conjugation', name: 'Conjugación', position: 13 },
+  ...GRAMMAR.map((g, i) => ({
+    kind: 'grammar',
+    slug: `grammar-n${g.level}`,
+    name: `Gramática N${g.level}`,
+    position: 14 + i,
+  })),
 ]
 
 function seed(): void {
@@ -320,6 +335,50 @@ function seed(): void {
           locked: level === 5 && !r.x ? 0 : 1,
         })
         insertCard.run({ item_id: itemId, card_type: 'reading', due: now, locked: 1 })
+      })
+    }
+
+    // Gramática: cada punto da dos cartas. Una pregunta qué significa el
+    // patrón —reconocerlo— y la otra lo borra de una frase para que haya que
+    // reponerlo, que es lo que enseña a usarlo.
+    for (const level of GRAMMAR) {
+      const id = deckId(`grammar-n${level.level}`)
+      level.points.forEach((point, i) => {
+        const example = point.examples[0]
+        insertItem.run({
+          deck_id: id,
+          glyph: point.pattern,
+          reading: point.reading,
+          alt: JSON.stringify({
+            meaning: point.alt ?? [],
+            form: point.form,
+            note: point.note,
+            examples: point.examples.map((e) => ({ jp: plain(e.jp), es: e.es })),
+            cloze: example ? blanked(example.jp) : '',
+            clozeAnswer: example ? answerOf(example.jp) : '',
+            clozeEs: example?.es ?? '',
+          }),
+          meaning: point.meaning,
+          block: 'grammar',
+          row_key: `n${level.level}`,
+          position: i,
+        })
+        const itemId = (
+          db.prepare('SELECT id FROM item WHERE deck_id = ? AND glyph = ?').get(id, point.pattern) as
+            | { id: number }
+            | undefined
+        )?.id
+        if (!itemId) return
+        insertCard.run({
+          item_id: itemId,
+          card_type: 'grammar',
+          due: now,
+          locked: level.level === 5 ? 0 : 1,
+        })
+        // Rellenar el hueco solo tiene sentido si se sabe qué significa.
+        if (example) {
+          insertCard.run({ item_id: itemId, card_type: 'cloze', due: now, locked: 1 })
+        }
       })
     }
 
@@ -475,6 +534,8 @@ function seed(): void {
  *     palabra la lectura espera al significado.
  *  8. Las formas de conjugación se abren en orden: la forma て no aparece
  *     hasta dominar la ます.
+ *  9. En gramática, rellenar el hueco espera a saber qué significa el
+ *     patrón, y los niveles avanzan en cadena.
  */
 export function refreshLocks(): void {
   const unlock = db.prepare('UPDATE card SET locked = 0 WHERE id = ? AND locked = 1')
@@ -572,6 +633,32 @@ export function refreshLocks(): void {
          JOIN deck d ON d.id = i.deck_id
          WHERE d.kind = 'kanji' AND c.card_type = 'meaning' AND c.state >= ?)`,
     ).run(MATURE)
+
+    // Regla 9 — usar el patrón espera a reconocerlo.
+    db.prepare(
+      `UPDATE card SET locked = 0
+       WHERE card_type = 'cloze' AND locked = 1 AND item_id IN (
+         SELECT c.item_id FROM card c WHERE c.card_type = 'grammar' AND c.state >= ?)`,
+    ).run(MATURE)
+
+    for (let i = 1; i < GRAMMAR.length; i++) {
+      const prev = GRAMMAR[i - 1].level
+      const stats = db
+        .prepare(
+          `SELECT COUNT(*) AS total, SUM(CASE WHEN c.state >= ? THEN 1 ELSE 0 END) AS done
+           FROM card c JOIN item i ON i.id = c.item_id JOIN deck d ON d.id = i.deck_id
+           WHERE d.slug = ? AND c.card_type = 'grammar'`,
+        )
+        .get(MATURE, `grammar-n${prev}`) as { total: number; done: number | null }
+      if (!stats.total) continue
+      if ((stats.done ?? 0) / stats.total < BLOCK_THRESHOLD) break
+
+      db.prepare(
+        `UPDATE card SET locked = 0
+         WHERE card_type = 'grammar' AND locked = 1 AND item_id IN (
+           SELECT i.id FROM item i JOIN deck d ON d.id = i.deck_id WHERE d.slug = ?)`,
+      ).run(`grammar-n${GRAMMAR[i].level}`)
+    }
 
     // Regla 8 — una forma de conjugación cada vez.
     for (let i = 1; i < CONJUGATION_FORMS.length; i++) {

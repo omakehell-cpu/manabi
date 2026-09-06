@@ -192,6 +192,51 @@ describe('progresión de kanji', () => {
   })
 })
 
+describe('vocabulario del JLPT', () => {
+  it('reparte las palabras en cinco niveles', () => {
+    const stats = getDeckStats().filter((d) => d.kind === 'vocabulary')
+    expect(stats).toHaveLength(5)
+    expect(stats.reduce((n, d) => n + d.characters, 0)).toBe(6483)
+  })
+
+  it('N5 abierto y el resto esperando', () => {
+    const stats = getDeckStats().filter((d) => d.kind === 'vocabulary')
+    expect(stats.find((d) => d.slug === 'vocab-n5')!.lessons).toBeGreaterThan(0)
+    expect(
+      stats.filter((d) => d.slug !== 'vocab-n5').every((d) => d.due + d.lessons === 0),
+    ).toBe(true)
+  })
+
+  it('empieza preguntando el significado, no la lectura', () => {
+    const batch = getLessons('vocab-n5')
+    expect([...new Set(batch.map((c) => c.cardType))]).toEqual(['recognition'])
+  })
+
+  it('las palabras traen su lectura y su traducción', () => {
+    const [card] = getLessons('vocab-n5')
+    expect(card.reading).toMatch(/^[ぁ-ゖァ-ヺー]+$/)
+    expect(card.meaning).toBeTruthy()
+  })
+
+  it('la lectura de una palabra se abre al asentar su significado', () => {
+    // Se comprueba palabra a palabra y no asentando el nivel entero: el cupo
+    // diario admite 500 cartas nuevas como mucho y N5 tiene 543 palabras,
+    // así que un nivel completo no cabe en un día. La cadena entre niveles
+    // usa exactamente la misma regla que los kanji, ya probada arriba.
+    const [word] = getLessons('vocab-n5', 1)
+    markPresented([word.cardId])
+
+    const lecturaDisponible = () =>
+      getLessons('vocab-n5', 999).some(
+        (c) => c.glyph === word.glyph && c.cardType === 'reading',
+      )
+
+    expect(lecturaDisponible()).toBe(false)
+    for (let i = 0; i < 6; i++) gradeCard(word.cardId, 4, 1000)
+    expect(lecturaDisponible()).toBe(true)
+  })
+})
+
 describe('cupo diario y bucle de aprendizaje', () => {
   it('las lecciones respetan el cupo', () => {
     setNewPerDay(5)

@@ -4,6 +4,11 @@ const BLURB: Record<string, string> = {
   hiragana: 'Los 104 signos: 46 básicos, 25 con dakuten y 33 combinados.',
   katakana: 'Los mismos 104, más 25 extendidos para extranjerismos.',
   vocab: 'Palabras escritas solo en kana. Se abren al dominar sus signos.',
+  'vocab-n5': 'Las primeras 543 palabras del examen.',
+  'vocab-n4': 'Vocabulario de la vida cotidiana.',
+  'vocab-n3': 'El salto al nivel intermedio.',
+  'vocab-n2': 'Lo que exige el material general.',
+  'vocab-n1': 'Vocabulario avanzado.',
   'kanji-n5': 'Los básicos del día a día.',
   'kanji-n4': 'Kanji comunes de la vida cotidiana.',
   'kanji-n3': 'El puente intermedio.',
@@ -14,6 +19,10 @@ const BLURB: Record<string, string> = {
 /** Qué hay que hacer para que se abra cada mazo cerrado. */
 const GATE: Record<string, string> = {
   vocab: 'Se abren al asentar los kana que las componen',
+  'vocab-n4': 'Se abre al asentar el 80 % de N5',
+  'vocab-n3': 'Se abre al asentar el 80 % de N4',
+  'vocab-n2': 'Se abre al asentar el 80 % de N3',
+  'vocab-n1': 'Se abre al asentar el 80 % de N2',
   'kanji-n4': 'Se abre al asentar el 80 % de N5',
   'kanji-n3': 'Se abre al asentar el 80 % de N4',
   'kanji-n2': 'Se abre al asentar el 80 % de N3',
@@ -26,8 +35,9 @@ interface Props {
 }
 
 export default function Home({ decks, onStudy }: Props) {
-  const kana = decks.filter((d) => d.kind !== 'kanji')
+  const kana = decks.filter((d) => d.kind !== 'kanji' && d.kind !== 'vocabulary')
   const kanji = decks.filter((d) => d.kind === 'kanji')
+  const vocabulary = decks.filter((d) => d.kind === 'vocabulary')
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 py-6">
@@ -48,6 +58,15 @@ export default function Home({ decks, onStudy }: Props) {
       </h2>
       <div className="mt-4 space-y-3">
         {kanji.map((d) => (
+          <DeckCard key={d.slug} deck={d} onStudy={onStudy} compact />
+        ))}
+      </div>
+
+      <h2 className="mt-10 text-sm tracking-wide text-muted uppercase">
+        Vocabulario · {vocabulary.reduce((n, d) => n + d.characters, 0)} palabras del JLPT
+      </h2>
+      <div className="mt-4 space-y-3">
+        {vocabulary.map((d) => (
           <DeckCard key={d.slug} deck={d} onStudy={onStudy} compact />
         ))}
       </div>

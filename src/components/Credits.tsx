@@ -31,8 +31,13 @@ export default function Credits() {
           />
           <Entry
             title="Listas JLPT de Jonathan Waller"
-            license="JLPT Resources"
-            text="Reparto de los kanji entre los niveles N5 a N1, distribuidas a través del paquete kanji-data y kanjiapi.dev."
+            license="JLPT Resources · tanos.co.uk"
+            text="Reparto de los kanji y del vocabulario entre los niveles N5 a N1, a través del paquete kanji-data, kanjiapi.dev y el repositorio elzup/jlpt-word-list (MIT)."
+          />
+          <Entry
+            title="Tatoeba"
+            license="CC BY 2.0 FR"
+            text="Frases de ejemplo japonés–español, una por kanji, con todos sus caracteres pertenecientes a niveles ya estudiados."
           />
           <Entry
             title="KanjiVG"

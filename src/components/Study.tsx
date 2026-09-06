@@ -93,7 +93,7 @@ function buildPrompt(card: StudyCard): Prompt {
   const kanaAlts = Array.isArray(parsed) ? (parsed as string[]) : []
   const vocabAlts = (parsed ?? {}) as { reading?: string[]; meaning?: string[] }
 
-  if (card.deckKind === 'vocab') {
+  if (card.deckKind === 'vocabulary' || card.deckKind === 'vocab') {
     if (card.cardType === 'recognition') {
       return {
         stimulus: card.glyph,

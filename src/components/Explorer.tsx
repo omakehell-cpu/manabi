@@ -45,7 +45,12 @@ const SCOPES = [
   { id: 'kanji', label: 'Kanji' },
   { id: 'hiragana', label: 'Hiragana' },
   { id: 'katakana', label: 'Katakana' },
-  { id: 'vocab', label: 'Vocabulario' },
+  { id: 'vocab', label: 'Palabras en kana' },
+  { id: 'vocab-n5', label: 'Vocab. N5' },
+  { id: 'vocab-n4', label: 'N4' },
+  { id: 'vocab-n3', label: 'N3' },
+  { id: 'vocab-n2', label: 'N2' },
+  { id: 'vocab-n1', label: 'N1' },
 ] as const
 
 type Scope = (typeof SCOPES)[number]['id']
@@ -169,7 +174,8 @@ export default function Explorer() {
       {shown && shown.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
           <span>
-            {shown.length} {scope === 'vocab' ? 'palabras' : scope === 'kanji' ? 'kanji' : 'signos'}
+            {shown.length}{' '}
+            {scope.startsWith('vocab') ? 'palabras' : scope === 'kanji' ? 'kanji' : 'signos'}
           </span>
           {(Object.keys(PROGRESS_LABEL) as KanjiProgress[])
             .filter((p) => counts[p] > 0)

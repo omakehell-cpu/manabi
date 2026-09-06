@@ -56,8 +56,10 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
   useEffect(() => setWriting(false), [card.cardId])
 
   // Los yōon (きゃ) no existen como una sola entrada en KanjiVG: se dibuja
-  // cada carácter por separado.
-  const strokeChars = [...card.glyph]
+  // cada carácter por separado. En vocabulario no se dibuja nada: son
+  // palabras, y lo que se aprende es la palabra, no cómo trazar sus signos.
+  const isCharacter = card.deckKind === 'hiragana' || card.deckKind === 'katakana' || isKanji
+  const strokeChars = isCharacter ? [...card.glyph] : []
 
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-6 py-8">
@@ -69,20 +71,20 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
         <Handwriting glyph={strokeChars[0]} size={230} />
       ) : (
       <div className="flex flex-wrap items-center justify-center gap-8">
-        {showStrokes && strokeChars.length <= 2 ? (
+        {showStrokes && strokeChars.length > 0 && strokeChars.length <= 2 ? (
           <div className="flex gap-3">
             {strokeChars.map((ch, i) => (
               <StrokeOrder key={`${ch}-${i}`} glyph={ch} size={strokeChars.length > 1 ? 130 : 180} autoPlay />
             ))}
           </div>
         ) : (
-          <span className={`jp leading-none ${card.glyph.length > 2 ? 'text-7xl' : 'text-[8rem]'}`}>
+          <span className={`jp leading-none ${[...card.glyph].length > 2 ? 'text-7xl' : 'text-[8rem]'}`}>
             {card.glyph}
           </span>
         )}
 
         <div className="max-w-sm text-center sm:text-left">
-          {strokeChars.length <= 2 && showStrokes && (
+          {strokeChars.length > 0 && strokeChars.length <= 2 && showStrokes && (
             <p className="jp mb-2 text-4xl">{card.glyph}</p>
           )}
 
@@ -96,12 +98,21 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
             </>
           ) : (
             <div className="flex items-center justify-center gap-2 sm:justify-start">
-              <p className="font-mono text-2xl">{card.reading}</p>
+              {/* En kana la lectura es rōmaji y va en monoespaciada; en
+                  vocabulario es kana y necesita la fuente japonesa. */}
+              <p
+                className={
+                  card.deckKind === 'vocabulary' ? 'jp text-2xl' : 'font-mono text-2xl'
+                }
+              >
+                {card.reading}
+              </p>
               <Speaker text={card.glyph} size="md" />
             </div>
           )}
 
           {!kanji && card.meaning && <p className="mt-2 text-lg text-muted">{card.meaning}</p>}
+
         </div>
       </div>
       )}

@@ -11,6 +11,7 @@ import KANJI_WORDS from '../src/data/kanji-words.json'
 // 2 MB que no tiene sentido cargar en el renderer para ver un kanji.
 import KANJI_STROKES from '../src/data/kanji-strokes.json'
 import SENTENCES from '../src/data/sentences.json'
+import VOCABULARY from '../src/data/vocabulary.json'
 
 export type CardType = 'recognition' | 'recall' | 'reading' | 'meaning' | 'word'
 
@@ -25,6 +26,15 @@ interface KanjiJson {
   s: number
   f: number
   g: number
+}
+
+/** Forma de cada registro en src/data/vocabulary.json. */
+interface VocabularyJson {
+  w: string
+  r: string
+  m: string
+  a: string[]
+  l: number
 }
 
 /** Forma de cada registro en src/data/vocab.json. */
@@ -150,6 +160,8 @@ function migrate(): void {
 
 /** Los niveles JLPT van de N5 (más fácil) a N1. */
 export const KANJI_LEVELS = [5, 4, 3, 2, 1] as const
+/** El vocabulario tiene su propio temario, con los mismos cinco niveles. */
+export const VOCAB_LEVELS = [5, 4, 3, 2, 1] as const
 
 const DECKS = [
   { kind: 'hiragana', slug: 'hiragana', name: 'Hiragana', position: 0 },
@@ -160,6 +172,12 @@ const DECKS = [
     slug: `kanji-n${n}`,
     name: `Kanji N${n}`,
     position: 3 + i,
+  })),
+  ...VOCAB_LEVELS.map((n, i) => ({
+    kind: 'vocabulary',
+    slug: `vocab-n${n}`,
+    name: `Vocabulario N${n}`,
+    position: 8 + i,
   })),
 ]
 
@@ -265,6 +283,42 @@ function seed(): void {
       })
     }
 
+    // Vocabulario del JLPT: un temario propio, en paralelo al de kanji.
+    //
+    // No espera a los kanji que contiene. Es deliberado: los libros enseñan
+    // vocabulario y kanji a la vez, y la lección presenta cada palabra con
+    // su lectura y su significado, así que se aprende como una unidad
+    // aunque sus caracteres aún no se hayan estudiado por separado.
+    for (const level of VOCAB_LEVELS) {
+      const id = deckId(`vocab-n${level}`)
+      const rows = (VOCABULARY as VocabularyJson[]).filter((r) => r.l === level)
+      rows.forEach((r, i) => {
+        insertItem.run({
+          deck_id: id,
+          glyph: r.w,
+          reading: r.r,
+          alt: JSON.stringify({ meaning: r.a, reading: [] }),
+          meaning: r.m,
+          block: 'jlpt',
+          row_key: `n${level}`,
+          position: i,
+        })
+        const itemId = (
+          db.prepare('SELECT id FROM item WHERE deck_id = ? AND glyph = ?').get(id, r.w) as
+            | { id: number }
+            | undefined
+        )?.id
+        if (!itemId) return
+        insertCard.run({
+          item_id: itemId,
+          card_type: 'recognition',
+          due: now,
+          locked: level === 5 ? 0 : 1,
+        })
+        insertCard.run({ item_id: itemId, card_type: 'reading', due: now, locked: 1 })
+      })
+    }
+
     // Palabras de ejemplo: la fase de «fijar en palabras». Cada una vive en
     // el mazo del kanji que la introduce y nace bloqueada hasta que ese
     // kanji está aprendido de forma aislada.
@@ -338,6 +392,8 @@ function seed(): void {
  *     quiere decir 漢, después cómo suena.
  *  6. Las palabras de un kanji esperan a que ese kanji esté aprendido
  *     aislado — el «primero aislados, después en palabras».
+ *  7. El vocabulario del JLPT avanza por niveles como los kanji, y en cada
+ *     palabra la lectura espera al significado.
  */
 export function refreshLocks(): void {
   const unlock = db.prepare('UPDATE card SET locked = 0 WHERE id = ? AND locked = 1')
@@ -434,6 +490,37 @@ export function refreshLocks(): void {
          SELECT c.item_id FROM card c JOIN item i ON i.id = c.item_id
          JOIN deck d ON d.id = i.deck_id
          WHERE d.kind = 'kanji' AND c.card_type = 'meaning' AND c.state >= ?)`,
+    ).run(MATURE)
+
+    // Regla 7 — el vocabulario avanza nivel a nivel, igual que los kanji.
+    for (let i = 1; i < VOCAB_LEVELS.length; i++) {
+      const prev = VOCAB_LEVELS[i - 1]
+      const stats = db
+        .prepare(
+          `SELECT COUNT(*) AS total, SUM(CASE WHEN c.state >= ? THEN 1 ELSE 0 END) AS done
+           FROM card c JOIN item i ON i.id = c.item_id JOIN deck d ON d.id = i.deck_id
+           WHERE d.slug = ? AND c.card_type = 'recognition'`,
+        )
+        .get(MATURE, `vocab-n${prev}`) as { total: number; done: number | null }
+
+      if (!stats.total) continue
+      if ((stats.done ?? 0) / stats.total < BLOCK_THRESHOLD) break
+
+      db.prepare(
+        `UPDATE card SET locked = 0
+         WHERE card_type = 'recognition' AND locked = 1 AND item_id IN (
+           SELECT i.id FROM item i JOIN deck d ON d.id = i.deck_id WHERE d.slug = ?)`,
+      ).run(`vocab-n${VOCAB_LEVELS[i]}`)
+    }
+
+    // En cada palabra, la lectura espera al significado: primero sabes qué
+    // quiere decir 会う, después cómo suena.
+    db.prepare(
+      `UPDATE card SET locked = 0
+       WHERE card_type = 'reading' AND locked = 1 AND item_id IN (
+         SELECT c.item_id FROM card c JOIN item i ON i.id = c.item_id
+         JOIN deck d ON d.id = i.deck_id
+         WHERE d.kind = 'vocabulary' AND c.card_type = 'recognition' AND c.state >= ?)`,
     ).run(MATURE)
 
     // Regla 6 — una palabra de kanji espera a que su kanji esté aprendido

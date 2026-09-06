@@ -10,7 +10,8 @@ Funciona sin conexión: todo el progreso vive en una base SQLite local.
 | **Hiragana** | 104 signos: 46 gojūon + 25 dakuten/handakuten + 33 yōon |
 | **Katakana** | los mismos 104 + 25 extendidos (ファ, ヴィ, ティ…) |
 | **Vocabulario en kana** | 434 palabras leídas en kana, generadas desde JMdict |
-| **Kanji N5 → N1** | 2383 caracteres con 4476 palabras de ejemplo |
+| **Kanji N5 → N1** | 2383 caracteres con 5443 palabras de ejemplo |
+| **Vocabulario N5 → N1** | 6483 palabras del JLPT, en cinco niveles |
 
 ### Los cinco niveles
 
@@ -176,6 +177,32 @@ Lo único que no se revierte son los desbloqueos. Si ese repaso abrió un
 bloque o un nivel, esas cartas siguen abiertas: volver a cerrarlas
 escondería material que ya has visto, y la apertura solo ocurre al cumplir
 el umbral, así que dejarlas no adelanta nada indebido.
+
+## Vocabulario del JLPT
+
+Un temario propio en cinco niveles, en paralelo al de kanji: 6483 palabras
+con su lectura y su traducción al español.
+
+| Nivel | Palabras |
+|---|---|
+| N5 | 543 |
+| N4 | 500 |
+| N3 | 1843 |
+| N2 | 1320 |
+| N1 | 2277 |
+
+Los niveles salen de las listas de Jonathan Waller —la misma procedencia que
+las de kanji, así que ambos temarios encajan— y las traducciones de JMdict,
+porque esas listas vienen en inglés. Se conserva el 80 % de las palabras: las
+que JMdict no traduce al español se descartan antes que mostrar inglés.
+
+**No espera a los kanji que contiene**, y es deliberado: los libros enseñan
+vocabulario y kanji a la vez, y la lección presenta cada palabra con su
+lectura y su significado, así que se aprende como una unidad aunque sus
+caracteres aún no se hayan estudiado por separado.
+
+Dentro de cada palabra, la lectura espera al significado; y los niveles se
+abren en cadena al 80 %, igual que los kanji.
 
 ## Escritura a mano
 

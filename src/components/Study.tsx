@@ -6,6 +6,7 @@ import Speaker from './Speaker'
 import StrokeOrder from './StrokeOrder'
 import LessonCard from './LessonCard'
 import { strokeVisibility, type StrokeMode } from '../lib/prefs'
+import { FORMS } from '../lib/conjugation'
 
 /** Detalle que se despliega al responder una carta de kanji. */
 interface KanjiDetail {
@@ -31,6 +32,13 @@ interface Prompt {
   word?: { reading: string; meaning: string }
   /** Otras acepciones: se enseñan al responder, no se aceptan como respuesta. */
   others?: string[]
+  conjugation?: {
+    meaning: string
+    reading: string
+    answer: string
+    answerKana: string
+    hint: string
+  }
 }
 
 function buildPrompt(card: StudyCard): Prompt {
@@ -39,6 +47,35 @@ function buildPrompt(card: StudyCard): Prompt {
     parsed = JSON.parse(card.alt)
   } catch {
     parsed = []
+  }
+
+  if (card.deckKind === 'conjugation') {
+    const c = parsed as {
+      word: string
+      wordReading: string
+      form: string
+      answer: string
+      answerKana: string
+    }
+    const info = FORMS.find((f) => f.id === c.form)
+    return {
+      stimulus: c.word,
+      stimulusIsJapanese: true,
+      question: `Ponlo en ${info?.label ?? c.form}`,
+      // Se responde en kana: exigir el kanji obligaría a tener un IME.
+      mode: 'reading',
+      expected: c.answerKana,
+      alternatives: [c.answerKana, c.answer],
+      placeholder: 'teclea en rōmaji',
+      audio: c.answer,
+      conjugation: {
+        meaning: card.meaning ?? '',
+        reading: c.wordReading,
+        answer: c.answer,
+        answerKana: c.answerKana,
+        hint: info?.hint ?? '',
+      },
+    }
   }
 
   if (card.deckKind === 'kanji' && card.cardType === 'word') {
@@ -761,7 +798,9 @@ export default function Study({ deck, deckName, onExit }: Props) {
             </p>
           )}
 
-          {phase === 'right' && prompt.audio && !prompt.word && (
+          {/* Las cartas de conjugación tienen su propio panel: aquí saldría
+              «新しい|masu», que es la clave interna del ítem. */}
+          {phase === 'right' && prompt.audio && !prompt.word && !prompt.conjugation && (
             <div className="mt-4 flex items-center justify-center gap-2 text-muted">
               <span className="jp text-2xl text-fg">{card.glyph}</span>
               <Speaker text={prompt.audio} size="md" />
@@ -777,6 +816,26 @@ export default function Study({ deck, deckName, onExit }: Props) {
                 strokeMode === 'always' || (strokeMode === 'onError' && phase === 'wrong')
               }
             />
+          )}
+
+          {answered && prompt.conjugation && (
+            <div
+              className={`mt-5 rounded-xl px-5 py-4 text-center ${
+                phase === 'wrong' ? 'bg-accent-soft' : 'border border-line bg-surface'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <p className="jp text-3xl">{prompt.conjugation.answer}</p>
+                <Speaker text={prompt.conjugation.answer} size="md" />
+              </div>
+              {prompt.conjugation.answerKana !== prompt.conjugation.answer && (
+                <p className="jp mt-1 text-lg text-muted">{prompt.conjugation.answerKana}</p>
+              )}
+              <p className="mt-2 text-sm text-muted">
+                {prompt.stimulus} ({prompt.conjugation.reading}) · {prompt.conjugation.meaning}
+              </p>
+              <p className="mt-1 text-xs text-muted">{prompt.conjugation.hint}</p>
+            </div>
           )}
 
           {answered && prompt.word && (

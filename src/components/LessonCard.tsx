@@ -4,6 +4,7 @@ import { cleanReading } from '../lib/speech'
 import Speaker from './Speaker'
 import StrokeOrder from './StrokeOrder'
 import Handwriting from './Handwriting'
+import { FORMS } from '../lib/conjugation'
 
 interface KanjiAlt {
   on?: string[]
@@ -64,6 +65,17 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
   // Los yōon (きゃ) no existen como una sola entrada en KanjiVG: se dibuja
   // cada carácter por separado. En vocabulario no se dibuja nada: son
   // palabras, y lo que se aprende es la palabra, no cómo trazar sus signos.
+  const conj =
+    card.deckKind === 'conjugation'
+      ? (alt as {
+          word: string
+          wordReading: string
+          form: string
+          answer: string
+          answerKana: string
+          cls: string
+        })
+      : null
   const isCharacter = card.deckKind === 'hiragana' || card.deckKind === 'katakana' || isKanji
   const strokeChars = isCharacter ? [...card.glyph] : []
 
@@ -75,6 +87,25 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
 
       {writing ? (
         <Handwriting glyph={strokeChars[0]} size={230} />
+      ) : conj ? (
+        <div className="flex flex-col items-center gap-3 text-center">
+          <p className="jp text-5xl">{conj.word}</p>
+          <p className="jp text-lg text-muted">{conj.wordReading}</p>
+          <p className="text-lg">{card.meaning}</p>
+          <p className="mt-4 text-xs tracking-wide text-muted uppercase">
+            {FORMS.find((f) => f.id === conj.form)?.label}
+          </p>
+          <div className="flex items-center gap-2">
+            <p className="jp text-4xl text-warn">{conj.answer}</p>
+            <Speaker text={conj.answer} size="md" />
+          </div>
+          {conj.answerKana !== conj.answer && (
+            <p className="jp text-lg text-muted">{conj.answerKana}</p>
+          )}
+          <p className="max-w-sm text-sm text-muted">
+            {FORMS.find((f) => f.id === conj.form)?.hint}
+          </p>
+        </div>
       ) : (
       <div className="flex flex-wrap items-center justify-center gap-8">
         {showStrokes && strokeChars.length > 0 && strokeChars.length <= 2 ? (

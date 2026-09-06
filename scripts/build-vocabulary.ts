@@ -13,6 +13,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { classOf } from '../src/lib/conjugation.ts'
 
 const SRC = process.argv[2]
 if (!SRC) {
@@ -37,6 +38,8 @@ export interface VocabularyRecord {
   l: 1 | 2 | 3 | 4 | 5
   /** Categoría gramatical abreviada: sust., verbo, adj-i, adj-na… */
   p: string
+  /** Clase de conjugación, si la palabra se conjuga. */
+  c?: string
 }
 
 /**
@@ -84,11 +87,15 @@ interface Sense {
   alt: string[]
   others: string[]
   pos: string
+  /** Etiquetas crudas de JMdict, para deducir la clase de conjugación. */
+  tags: string[]
 }
 
-/** Indexado por «escritura|lectura» y también solo por lectura. */
+/** Indexado por «escritura|lectura», por lectura de palabras sin kanji, y
+ *  por lectura a secas como último recurso. */
 const byPair = new Map<string, Sense>()
 const byReading = new Map<string, Sense>()
+const byAnyReading = new Map<string, Sense>()
 
 const decodeEntities = (s: string) =>
   s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
@@ -134,6 +141,7 @@ function collectSenses(entry: string, tags: string[]): Sense | null {
     alt: firstOriginal !== first ? [firstOriginal] : [],
     others: rest.slice(0, 3),
     pos: grammarLabel(tags),
+    tags,
   }
 }
 
@@ -149,6 +157,7 @@ for (const entry of xml.split('<entry>').slice(1)) {
   for (const r of readings) {
     // La primera entrada gana: JMdict las ordena por relevancia.
     if (!writings.length && !byReading.has(r)) byReading.set(r, sense)
+    if (!byAnyReading.has(r)) byAnyReading.set(r, sense)
     for (const w of writings) {
       const key = `${w}|${r}`
       if (!byPair.has(key)) byPair.set(key, sense)
@@ -193,19 +202,32 @@ for (const level of LEVELS) {
     if (!expression || !reading) continue
 
     const word = expression.trim()
-    const kana = reading.trim() || word
+    // Las listas dan a veces varias lecturas separadas por punto y coma
+    // —行く es «いく; ゆく»— y compararlas como una sola cadena no casaba
+    // con JMdict, así que 行く se perdía pese a ser una palabra de N5.
+    const readings = reading
+      .split(/[;；]/)
+      .map((r) => r.trim())
+      .filter(Boolean)
+    const kana = readings[0] || word
     if (seen.has(word)) continue
     counted[level]++
 
-    // Se busca primero la pareja exacta escritura+lectura; si la palabra se
-    // escribe solo en kana, basta la lectura.
-    const sense = byPair.get(`${word}|${kana}`) ?? (word === kana ? byReading.get(kana) : undefined)
+    // Primero la pareja exacta escritura+lectura; luego, si la palabra se
+    // escribe solo en kana, por lectura. Y como último recurso, por lectura
+    // aunque JMdict la guarde con kanji: する aparece allí como 為る y de
+    // otro modo se quedaría fuera.
+    const sense =
+      readings.map((r) => byPair.get(`${word}|${r}`)).find(Boolean) ??
+      (word === kana ? byReading.get(kana) : undefined) ??
+      (word === kana ? byAnyReading.get(kana) : undefined)
     if (!sense) {
       missing[level]++
       continue
     }
 
     seen.add(word)
+    const cls = classOf(sense.tags)
     records.push({
       w: word,
       r: kana,
@@ -214,6 +236,7 @@ for (const level of LEVELS) {
       o: sense.others,
       l: level,
       p: sense.pos,
+      ...(cls ? { c: cls } : {}),
     })
   }
 }
@@ -233,7 +256,9 @@ for (const n of LEVELS) {
 console.log(`\ntotal: ${records.length} palabras`)
 const conPos = records.filter((r) => r.p).length
 const conVarias = records.filter((r) => r.o.length).length
+const conClase = records.filter((r) => r.c).length
 console.log(`\ncon categoría gramatical: ${conPos} (${Math.round((conPos / records.length) * 100)} %)`)
+console.log(`conjugables: ${conClase} (${Math.round((conClase / records.length) * 100)} %)`)
 console.log(`con más de una acepción: ${conVarias} (${Math.round((conVarias / records.length) * 100)} %)`)
 console.log('\nmuestra de N5:')
 for (const r of records.filter((r) => r.l === 5).slice(0, 12)) {

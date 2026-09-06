@@ -12,8 +12,9 @@ import KANJI_WORDS from '../src/data/kanji-words.json'
 import KANJI_STROKES from '../src/data/kanji-strokes.json'
 import SENTENCES from '../src/data/sentences.json'
 import VOCABULARY from '../src/data/vocabulary.json'
+import CONJUGATION from '../src/data/conjugation.json'
 
-export type CardType = 'recognition' | 'recall' | 'reading' | 'meaning' | 'word'
+export type CardType = 'recognition' | 'recall' | 'reading' | 'meaning' | 'word' | 'conjugation'
 
 /** Forma de cada registro en src/data/kanji.json (ver scripts/build-kanji.ts). */
 interface KanjiJson {
@@ -26,6 +27,18 @@ interface KanjiJson {
   s: number
   f: number
   g: number
+}
+
+/** Forma de cada registro en src/data/conjugation.json. */
+interface ConjugationJson {
+  w: string
+  r: string
+  m: string
+  c: string
+  f: string
+  a: string
+  ar: string
+  l: number
 }
 
 /** Forma de cada registro en src/data/vocabulary.json. */
@@ -174,6 +187,21 @@ export const KANJI_LEVELS = [5, 4, 3, 2, 1] as const
 /** El vocabulario tiene su propio temario, con los mismos cinco niveles. */
 export const VOCAB_LEVELS = [5, 4, 3, 2, 1] as const
 
+/**
+ * Orden en que se aprenden las formas. Se estudia una forma cada vez —todas
+ * las palabras en ます, después todas en て— porque lo que se aprende es la
+ * regla, no cada palabra por separado.
+ */
+export const CONJUGATION_FORMS = [
+  'masu',
+  'te',
+  'ta',
+  'nai',
+  'nakatta',
+  'potential',
+  'volitional',
+] as const
+
 const DECKS = [
   { kind: 'hiragana', slug: 'hiragana', name: 'Hiragana', position: 0 },
   { kind: 'katakana', slug: 'katakana', name: 'Katakana', position: 1 },
@@ -190,6 +218,7 @@ const DECKS = [
     name: `Vocabulario N${n}`,
     position: 8 + i,
   })),
+  { kind: 'conjugation', slug: 'conjugation', name: 'Conjugación', position: 13 },
 ]
 
 function seed(): void {
@@ -291,6 +320,45 @@ function seed(): void {
           locked: level === 5 && !r.x ? 0 : 1,
         })
         insertCard.run({ item_id: itemId, card_type: 'reading', due: now, locked: 1 })
+      })
+    }
+
+    // Conjugación: se practica la regla, no la palabra. Cada ficha es una
+    // pareja (palabra, forma), y las formas se abren en orden.
+    {
+      const id = deckId('conjugation')
+      ;(CONJUGATION as ConjugationJson[]).forEach((r, i) => {
+        const key = `${r.w}|${r.f}`
+        insertItem.run({
+          deck_id: id,
+          glyph: key,
+          reading: r.ar,
+          alt: JSON.stringify({
+            word: r.w,
+            wordReading: r.r,
+            form: r.f,
+            answer: r.a,
+            answerKana: r.ar,
+            cls: r.c,
+          }),
+          meaning: r.m,
+          block: r.f,
+          row_key: r.c,
+          position: i,
+        })
+        const itemId = (
+          db.prepare('SELECT id FROM item WHERE deck_id = ? AND glyph = ?').get(id, key) as
+            | { id: number }
+            | undefined
+        )?.id
+        if (itemId) {
+          insertCard.run({
+            item_id: itemId,
+            card_type: 'conjugation',
+            due: now,
+            locked: r.f === CONJUGATION_FORMS[0] ? 0 : 1,
+          })
+        }
       })
     }
 
@@ -405,6 +473,8 @@ function seed(): void {
  *     aislado — el «primero aislados, después en palabras».
  *  7. El vocabulario del JLPT avanza por niveles como los kanji, y en cada
  *     palabra la lectura espera al significado.
+ *  8. Las formas de conjugación se abren en orden: la forma て no aparece
+ *     hasta dominar la ます.
  */
 export function refreshLocks(): void {
   const unlock = db.prepare('UPDATE card SET locked = 0 WHERE id = ? AND locked = 1')
@@ -502,6 +572,28 @@ export function refreshLocks(): void {
          JOIN deck d ON d.id = i.deck_id
          WHERE d.kind = 'kanji' AND c.card_type = 'meaning' AND c.state >= ?)`,
     ).run(MATURE)
+
+    // Regla 8 — una forma de conjugación cada vez.
+    for (let i = 1; i < CONJUGATION_FORMS.length; i++) {
+      const prev = CONJUGATION_FORMS[i - 1]
+      const stats = db
+        .prepare(
+          `SELECT COUNT(*) AS total, SUM(CASE WHEN c.state >= ? THEN 1 ELSE 0 END) AS done
+           FROM card c JOIN item i ON i.id = c.item_id JOIN deck d ON d.id = i.deck_id
+           WHERE d.slug = 'conjugation' AND i.block = ?`,
+        )
+        .get(MATURE, prev) as { total: number; done: number | null }
+
+      if (!stats.total) continue
+      if ((stats.done ?? 0) / stats.total < BLOCK_THRESHOLD) break
+
+      db.prepare(
+        `UPDATE card SET locked = 0
+         WHERE locked = 1 AND item_id IN (
+           SELECT i.id FROM item i JOIN deck d ON d.id = i.deck_id
+           WHERE d.slug = 'conjugation' AND i.block = ?)`,
+      ).run(CONJUGATION_FORMS[i])
+    }
 
     // Regla 7 — el vocabulario avanza nivel a nivel, igual que los kanji.
     for (let i = 1; i < VOCAB_LEVELS.length; i++) {

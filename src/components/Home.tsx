@@ -9,6 +9,7 @@ const BLURB: Record<string, string> = {
   'vocab-n3': 'El salto al nivel intermedio.',
   'vocab-n2': 'Lo que exige el material general.',
   'vocab-n1': 'Vocabulario avanzado.',
+  conjugation: 'Las formas de los verbos y los adjetivos, una regla cada vez.',
   'kanji-n5': 'Los básicos del día a día.',
   'kanji-n4': 'Kanji comunes de la vida cotidiana.',
   'kanji-n3': 'El puente intermedio.',
@@ -38,6 +39,7 @@ export default function Home({ decks, onStudy }: Props) {
   const kana = decks.filter((d) => d.kind !== 'kanji' && d.kind !== 'vocabulary')
   const kanji = decks.filter((d) => d.kind === 'kanji')
   const vocabulary = decks.filter((d) => d.kind === 'vocabulary')
+  const conjugation = decks.filter((d) => d.kind === 'conjugation')
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 py-6">
@@ -68,6 +70,13 @@ export default function Home({ decks, onStudy }: Props) {
       <div className="mt-4 space-y-3">
         {vocabulary.map((d) => (
           <DeckCard key={d.slug} deck={d} onStudy={onStudy} compact />
+        ))}
+      </div>
+
+      <h2 className="mt-10 text-sm tracking-wide text-muted uppercase">Gramática</h2>
+      <div className="mt-4 space-y-4">
+        {conjugation.map((d) => (
+          <DeckCard key={d.slug} deck={d} onStudy={onStudy} />
         ))}
       </div>
     </div>

@@ -11,7 +11,8 @@ Funciona sin conexión: todo el progreso vive en una base SQLite local.
 | **Katakana** | los mismos 104 + 25 extendidos (ファ, ヴィ, ティ…) |
 | **Vocabulario en kana** | 434 palabras leídas en kana, generadas desde JMdict |
 | **Kanji N5 → N1** | 2383 caracteres con 5443 palabras de ejemplo |
-| **Vocabulario N5 → N1** | 6689 palabras del JLPT, en cinco niveles |
+| **Vocabulario N5 → N1** | 7057 palabras del JLPT, en cinco niveles |
+| **Conjugación** | 7 formas de verbos y adjetivos, 654 fichas |
 
 ### Los cinco niveles
 
@@ -217,6 +218,35 @@ caracteres aún no se hayan estudiado por separado.
 
 Dentro de cada palabra, la lectura espera al significado; y los niveles se
 abren en cadena al 80 %, igual que los kanji.
+
+## Conjugación
+
+Un mazo propio para las formas de verbos y adjetivos: ます, て, た, ない,
+なかった, potencial y volitivo.
+
+**No se conjugan las 3366 palabras conjugables del temario**, porque la
+conjugación no se memoriza palabra a palabra: se aprende como regla. Una vez
+sabes que un godan en く hace いて, lo aplicas a todos. Se practican entonces
+ocho palabras representativas de cada uno de los 14 grupos que cambian la
+regla —la clase, y en los godan la última sílaba— lo que da 98 palabras y
+654 fichas.
+
+Las formas se abren de una en una: la て no aparece hasta dominar la ます. Se
+estudia una regla cada vez, no una palabra cada vez.
+
+Las reglas viven en [src/lib/conjugation.ts](src/lib/conjugation.ts) y se
+calculan, no se almacenan. Están cubiertas por 17 pruebas que vigilan sobre
+todo las excepciones, que es donde todo el mundo falla:
+
+- **行く** hace 行って y no 行いて, siendo el único godan en く que lo hace.
+- **買う** hace 買わない y no 買あない: la fila あ de う es わ.
+- **いい / 良い** se conjugan como よい: よかった, nunca いかった.
+- **来る** cambia de lectura en cada forma: く.る, き.ます, こ.ない.
+- Los adjetivos no tienen potencial ni volitivo, así que esas fichas no se
+  generan en lugar de inventarlas.
+
+Se responde en kana, no en kanji: exigir el kanji obligaría a tener un IME
+instalado.
 
 ## Escritura a mano
 

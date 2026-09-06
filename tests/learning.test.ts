@@ -199,7 +199,7 @@ describe('vocabulario del JLPT', () => {
   it('reparte las palabras en cinco niveles', () => {
     const stats = getDeckStats().filter((d) => d.kind === 'vocabulary')
     expect(stats).toHaveLength(5)
-    expect(stats.reduce((n, d) => n + d.characters, 0)).toBe(6689)
+    expect(stats.reduce((n, d) => n + d.characters, 0)).toBe(7057)
   })
 
   it('N5 abierto y el resto esperando', () => {
@@ -300,6 +300,43 @@ describe('retención objetivo', () => {
   })
 })
 
+describe('conjugación', () => {
+  it('cubre todas las clases y terminaciones', () => {
+    const rows = JSON.parse(readFileSync('src/data/conjugation.json', 'utf8')) as {
+      w: string
+      c: string
+      f: string
+      a: string
+    }[]
+    // Lo que cambia la regla es la clase y, en los godan, la última sílaba.
+    const grupos = new Set(rows.map((r) => (r.c === 'v5' ? `v5${[...r.w].at(-1)}` : r.c)))
+    expect(grupos.size).toBeGreaterThanOrEqual(13)
+  })
+
+  it('incluye las excepciones que más se fallan', () => {
+    const rows = JSON.parse(readFileSync('src/data/conjugation.json', 'utf8')) as {
+      w: string
+      f: string
+      a: string
+    }[]
+    const te = (w: string) => rows.find((r) => r.w === w && r.f === 'te')?.a
+    // 行く es el único godan en く que hace って; 良い se conjuga como よい.
+    expect(te('行く')).toBe('行って')
+    expect(rows.find((r) => r.w === '良い' && r.f === 'ta')?.a).toBe('よかった')
+    expect(te('来る')).toBe('来て')
+    expect(te('する')).toBe('して')
+  })
+
+  it('las formas se abren en orden', () => {
+    const stats = getDeckStats().find((d) => d.slug === 'conjugation')!
+    expect(stats.lessons).toBeGreaterThan(0)
+
+    const batch = getLessons('conjugation', 999)
+    // Solo la primera forma está abierta al principio.
+    expect([...new Set(batch.map((c) => c.block))]).toEqual(['masu'])
+  })
+})
+
 describe('tope global de cartas nuevas', () => {
   it('existe además del cupo por mazo', () => {
     expect(newPerDayTotal()).toBeGreaterThan(0)
@@ -321,6 +358,15 @@ describe('tope global de cartas nuevas', () => {
 })
 
 describe('calidad del vocabulario', () => {
+  it('encuentra las palabras que JMdict guarda con otra grafía', () => {
+    const vocab = JSON.parse(readFileSync('src/data/vocabulary.json', 'utf8')) as { w: string }[]
+    const words = new Set(vocab.map((v) => v.w))
+    // 行く venía en las listas como «いく; ゆく» y する está en JMdict como
+    // 為る: sin tratar esos dos casos se perdían 368 palabras.
+    expect(words.has('行く')).toBe(true)
+    expect(words.has('する')).toBe(true)
+  })
+
   it('cada palabra lleva su categoría gramatical', () => {
     const vocab = JSON.parse(readFileSync('src/data/vocabulary.json', 'utf8')) as {
       w: string

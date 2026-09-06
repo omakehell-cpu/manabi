@@ -1,6 +1,7 @@
 # Manabi
 
-Flipcards de japonés para Windows y macOS, con repetición espaciada FSRS.
+Flipcards de japonés para Windows, macOS y Linux, con repetición espaciada
+FSRS.
 Funciona sin conexión: todo el progreso vive en una base SQLite local.
 
 ## Modos
@@ -639,8 +640,20 @@ después de tocarlo.
   cargador busca el `.node` con rutas relativas al módulo; empaquetarlo
   rompe esa búsqueda. Ojo: Vite 8 lee `build.rolldownOptions`, no
   `rollupOptions` — este último se ignora en silencio.
-- Trae prebuilds N-API para todas las plataformas, así que el instalador de
-  Windows se genera desde macOS sin compilar nada.
+- Trae prebuilds N-API para las ocho plataformas dentro del propio paquete,
+  así que desde macOS se generan también los instaladores de Windows y de
+  Linux sin compilar nada ni levantar un contenedor.
+
+  | Sistema | Formato |
+  |---|---|
+  | macOS | `.dmg`, Apple Silicon e Intel por separado |
+  | Windows | instalador NSIS `.exe`, x64 |
+  | Linux | `.AppImage` (cualquier distribución) y `.deb` (Debian, Ubuntu) |
+
+  El `.deb` exige un mantenedor y lo lleva escrito dentro, así que ahí va la
+  dirección de GitHub y no la personal. `syncDesktopName` asocia la ventana
+  con su entrada `.desktop`: sin eso el escritorio la muestra con el icono
+  genérico en la barra de tareas.
 - **Noto Sans JP va empaquetada.** Sin ella, Windows sin paquete de idioma
   japonés muestra cuadros vacíos, y varias fuentes CJK del sistema dibujan
   los glifos con formas chinas en lugar de japonesas.

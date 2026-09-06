@@ -1,6 +1,6 @@
 {
   "name": "manabi",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Flashcards de japonés con repetición espaciada: kana, kanji, vocabulario, conjugación y gramática",
   "main": "dist-electron/main.js",
   "author": "omakehell",
@@ -22,7 +22,8 @@
     "data:sentences": "node --max-old-space-size=8192 --experimental-strip-types scripts/build-sentences.ts",
     "data:vocabulary": "node --max-old-space-size=8192 --experimental-strip-types scripts/build-vocabulary.ts",
     "data:conjugation": "node --experimental-strip-types scripts/build-conjugation.ts",
-    "data:components": "node --max-old-space-size=4096 --experimental-strip-types scripts/build-components.ts"
+    "data:components": "node --max-old-space-size=4096 --experimental-strip-types scripts/build-components.ts",
+    "dist:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
     "@fontsource/noto-sans-jp": "^5.3.0",
@@ -50,5 +51,6 @@
   },
   "allowScripts": {
     "better-sqlite3@13.0.3": true
-  }
+  },
+  "desktopName": "manabi.desktop"
 }

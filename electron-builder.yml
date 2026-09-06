@@ -31,6 +31,25 @@ win:
     - target: nsis
       arch: [x64]
 
+# El binario nativo de better-sqlite3 viene precompilado para las ocho
+# plataformas dentro del propio paquete, así que Linux se empaqueta desde
+# el Mac igual que Windows. AppImage para que funcione en cualquier
+# distribución sin instalar nada, y .deb para Debian y Ubuntu.
+linux:
+  category: Education
+  # El .deb exige un mantenedor. Va la dirección de GitHub y no la
+  # personal: el paquete lo lleva dentro y cualquiera puede leerlo.
+  maintainer: omakehell <246890202+omakehell-cpu@users.noreply.github.com>
+  # Sin esto el escritorio no asocia la ventana con su entrada .desktop y
+  # la app aparece con el icono genérico en la barra de tareas.
+  syncDesktopName: true
+  synopsis: Flipcards de japonés con repetición espaciada
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true

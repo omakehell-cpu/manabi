@@ -26,6 +26,10 @@ mac:
   # verdad hay que firmar y notarizar.
   identity: null
 
+# Con identity: null la app queda mal firmada, no sin firmar, y macOS la
+# rechaza como si estuviera manipulada. El hook la firma ad-hoc.
+afterPack: ./scripts/adhoc-sign.cjs
+
 win:
   target:
     - target: nsis

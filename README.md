@@ -13,7 +13,7 @@ Funciona sin conexión: todo el progreso vive en una base SQLite local.
 | **Kanji N5 → N1** | 2383 caracteres con 5443 palabras de ejemplo |
 | **Vocabulario N5 → N1** | 7057 palabras del JLPT, en cinco niveles |
 | **Conjugación** | 7 formas de verbos y adjetivos, 654 fichas |
-| **Gramática N5 → N3** | partículas y estructuras, escritas para la app |
+| **Gramática N5 → N1** | 249 puntos, escritos para esta aplicación |
 
 ### Los cinco niveles
 
@@ -262,7 +262,26 @@ una frase para que haya que reponerlo. La segunda es la que enseña a usarlo;
 la primera, a reconocerlo, y por eso rellenar el hueco espera a haber
 aprendido el significado.
 
-Estado: **N5, N4 y N3 escritos**; N2 y N1 pendientes.
+| Nivel | Puntos |
+|---|---|
+| N5 | 56 |
+| N4 | 49 |
+| N3 | 50 |
+| N2 | 50 |
+| N1 | 44 |
+
+Están los cinco niveles: desde las partículas que sostienen cualquier frase
+hasta las formas del japonés escrito y clásico que sobreviven en la prensa y
+los avisos oficiales.
+
+Las notas no se limitan a traducir el patrón: explican con qué se confunde,
+que es donde está la dificultad real. は frente a が, に frente a で, たら
+frente a ば, について frente a に対して, さ frente a み.
+
+Hay 13 pruebas sobre el temario. Además de comprobar que cada punto tenga
+explicación, formación y ejemplos marcados, vigilan que no se cuele ningún
+carácter de otro alfabeto: escribiendo a mano se coló un 참 coreano en N3 y
+un marcador en ruso en N1, y las dos veces fue el test quien lo encontró.
 
 ## Escritura a mano
 

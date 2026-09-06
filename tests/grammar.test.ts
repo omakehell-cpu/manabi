@@ -55,6 +55,24 @@ describe('temario de gramática', () => {
   })
 })
 
+describe('cobertura del temario', () => {
+  it('están los cinco niveles', () => {
+    expect(GRAMMAR.map((l) => l.level)).toEqual([5, 4, 3, 2, 1])
+  })
+
+  it('cada nivel tiene un temario con cuerpo', () => {
+    for (const l of GRAMMAR) {
+      expect(l.points.length, `N${l.level}`).toBeGreaterThanOrEqual(30)
+    }
+  })
+
+  it('no se repite un patrón entre niveles', () => {
+    const patterns = all.map((p) => p.pattern)
+    const dup = patterns.filter((x, i) => patterns.indexOf(x) !== i)
+    expect(dup).toEqual([])
+  })
+})
+
 describe('huecos', () => {
   it('quita las llaves para mostrar la frase entera', () => {
     expect(plain('私{は}学生です。')).toBe('私は学生です。')

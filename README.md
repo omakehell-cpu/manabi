@@ -466,6 +466,19 @@ lecciones, el cupo diario, las cartas apartadas, el explorador, el trazado y
 deshacer, todo sin abrir Electron. Ha cazado varios fallos que la interfaz
 no delataba.
 
+### Versionado
+
+Versionado semántico, y el número sube en el mismo commit que el cambio:
+
+| Cambio | Sube |
+|---|---|
+| Arreglos y cambios menores | `x.y.Z` |
+| Una funcionalidad o mejora nueva | `x.Y.0` |
+| Una versión con cambios importantes | `X.0.0` |
+
+Los instaladores llevan el número en el nombre, así que hay que regenerarlos
+después de tocarlo.
+
 ### Diferencias entre sistemas
 
 - **La barra de menú se oculta** (`autoHideMenuBar`). En macOS el menú vive

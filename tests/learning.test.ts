@@ -27,6 +27,7 @@ import {
   previewIntervals,
   suspendCard,
   componentsOf,
+  wordsForKanji,
   retention,
   setRetention,
 } from '../electron/db'
@@ -64,6 +65,11 @@ const kanjiData = JSON.parse(readFileSync('src/data/kanji.json', 'utf8')) as {
   k: string
   l: number
   s: number
+}[]
+
+const kanjiWords = JSON.parse(readFileSync('src/data/kanji-words.json', 'utf8')) as {
+  w: string
+  k: string
 }[]
 
 beforeAll(() => {
@@ -195,6 +201,33 @@ describe('progresión de kanji', () => {
       [...c.glyph].some((ch) => /[一-鿿]/.test(ch) && !n5.has(ch)),
     )
     expect(intrusas).toHaveLength(0)
+  })
+})
+
+describe('palabras de ejemplo de un kanji', () => {
+  it('reparte la lectura entre los caracteres', () => {
+    const word = wordsForKanji('中').find((w) => w.word === '中国人')!
+    expect(word.parts!.map((p) => `${p.text}(${p.reading})`).join('·')).toBe(
+      '中(ちゅう)·国(ごく)·人(じん)',
+    )
+  })
+
+  it('descarta las palabras con un kanji que aún no se ha presentado', () => {
+    // A estas alturas solo se ha presentado N5. 会社 es más frecuente que
+    // 入社, pero usa 会, que es de N4 y todavía no se ha visto: enseñarla
+    // ahora sería pedir un carácter desconocido para fijar otro.
+    const shown = wordsForKanji('社').map((w) => w.word)
+    expect(shown).toContain('入社')
+    expect(shown).not.toContain('会社')
+  })
+
+  it('antes que ningún ejemplo, muestra los que hay', () => {
+    // 誌 solo tiene 雑誌, y 雑 es de un nivel posterior. Sin la vuelta
+    // atrás la ficha se quedaría sin una sola palabra.
+    for (const glyph of ['社', '中', '誌']) {
+      const all = kanjiWords.filter((w) => w.k === glyph)
+      if (all.length) expect(wordsForKanji(glyph).length).toBeGreaterThan(0)
+    }
   })
 })
 

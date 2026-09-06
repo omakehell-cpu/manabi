@@ -3,7 +3,9 @@ import { toHiragana, toKatakana } from 'wanakana'
 import type { KanjiBrowseItem, KanjiDetail, KanjiProgress, SimpleBrowseItem } from '../types'
 import { cleanReading } from '../lib/speech'
 import Speaker from './Speaker'
+import Furigana from './Furigana'
 import StrokeOrder from './StrokeOrder'
+import StrokeSteps from './StrokeSteps'
 import { ExampleSentence } from './LessonCard'
 import Handwriting from './Handwriting'
 import Components from './Components'
@@ -248,6 +250,16 @@ function DetailPanel({ detail, onClose }: { detail: KanjiDetail; onClose: () => 
     setWriting(false)
   }, [detail.glyph])
 
+  // Las lecturas que suenan de verdad en los ejemplos de abajo, para
+  // marcarlas en la lista y que deje de ser un inventario sin uso.
+  const usedReadings = new Set(
+    detail.words.flatMap((w) =>
+      (w.parts ?? [])
+        .filter((p) => p.text === detail.glyph && p.source)
+        .map((p) => p.source!),
+    ),
+  )
+
   const due = detail.nextDue ? new Date(detail.nextDue) : null
   const dueLabel =
     detail.progress === 'locked'
@@ -300,9 +312,19 @@ function DetailPanel({ detail, onClose }: { detail: KanjiDetail; onClose: () => 
           )}
         </div>
 
+        {!writing && (
+          <div className="mt-5">
+            <StrokeSteps glyph={detail.glyph} size={42} />
+          </div>
+        )}
+
         <div className="mt-6 space-y-2">
-          {detail.on.length > 0 && <ReadingRow label="ON" readings={detail.on} />}
-          {detail.kun.length > 0 && <ReadingRow label="KUN" readings={detail.kun} />}
+          {detail.on.length > 0 && (
+            <ReadingRow label="ON" readings={detail.on} used={usedReadings} />
+          )}
+          {detail.kun.length > 0 && (
+            <ReadingRow label="KUN" readings={detail.kun} used={usedReadings} />
+          )}
         </div>
 
         <Components glyph={detail.glyph} />
@@ -314,8 +336,7 @@ function DetailPanel({ detail, onClose }: { detail: KanjiDetail; onClose: () => 
           <ul className="mt-3 space-y-2">
             {detail.words.map((w) => (
               <li key={w.word} className="flex items-baseline gap-3 text-sm">
-                <span className="jp text-lg">{w.word}</span>
-                <span className="jp text-muted">{w.reading}</span>
+                <Furigana word={w.word} reading={w.reading} parts={w.parts} focus={detail.glyph} />
                 <Speaker text={w.word} />
                 <span className="ml-auto text-right text-muted">{w.meaning}</span>
               </li>
@@ -339,14 +360,28 @@ function DetailPanel({ detail, onClose }: { detail: KanjiDetail; onClose: () => 
   )
 }
 
-function ReadingRow({ label, readings }: { label: string; readings: string[] }) {
+function ReadingRow({
+  label,
+  readings,
+  used,
+}: {
+  label: string
+  readings: string[]
+  /** Lecturas que suenan en alguna de las palabras de ejemplo de abajo. */
+  used?: Set<string>
+}) {
   return (
     <div className="flex items-start gap-3">
       <span className="mt-1.5 w-8 shrink-0 text-xs tracking-wide text-muted">{label}</span>
       <div className="flex flex-wrap items-center gap-1">
         {readings.map((r) => (
-          <span key={r} className="flex items-center rounded-md bg-raised/60 pl-2">
-            <span className="jp text-lg">{r}</span>
+          <span
+            key={r}
+            className={`flex items-center rounded-md pl-2 ${
+              used?.has(r) ? 'bg-warn/10 ring-1 ring-warn/30' : 'bg-raised/60'
+            }`}
+          >
+            <span className={`jp text-lg ${used?.has(r) ? 'text-warn' : ''}`}>{r}</span>
             <Speaker text={cleanReading(r)} label={r} />
           </span>
         ))}

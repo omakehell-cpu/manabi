@@ -348,6 +348,50 @@ detecta el sentido invertido.
 El resultado pinta cada trazo en verde o rojo y señala el primero que falla,
 diciendo si además iba en el otro sentido.
 
+## La lectura, repartida entre los caracteres
+
+Ver `中国人 ちゅうごくじん` no enseña que 中 sea ちゅう: la lectura llega
+como un bloque y hay que adivinar dónde acaba cada pieza. Los libros de
+kanji lo escriben separado —ちゅう・がく— y ahí es donde se aprende una
+lectura: dentro de una palabra de verdad, no en una lista.
+
+Cada palabra de ejemplo lleva ahora la lectura sobre su carácter, y en color
+la del kanji que se está estudiando. El reparto se calcula en
+[src/lib/furigana.ts](src/lib/furigana.ts) y necesita dos reglas fonéticas,
+porque un kanji casi nunca suena compuesto igual que solo:
+
+| | Aislado | En la palabra |
+|---|---|---|
+| **Rendaku** | 中 チュウ | 一日中 いちにち**じゅう** |
+| **Geminación** | 学 ガク | 中学校 ちゅう**がっ**こう |
+
+Sin ellas falla una de cada cinco palabras. Con ellas se reparten **5332 de
+5443** (98,0 %). El resto son jukujikun de verdad —大人 es おとな sin que ni
+お ni とな pertenezcan a ningún carácter, y lo mismo 時計 とけい o 切手
+きって—: ahí no se corta y se muestra la lectura entera, porque inventar un
+corte enseñaría una mentira.
+
+Como efecto secundario, la lista de lecturas de la ficha deja de ser un
+inventario: se marca cuál suena en los ejemplos de abajo, con el mismo color
+que lleva sobre la palabra. En 中 se ilumina チュウ; なか, que también está
+listada, se queda apagada hasta que aparezca una palabra que la use.
+
+## Ejemplos con lo que ya sabes
+
+El generador asigna cada palabra al **último de sus kanji en el orden de
+estudio**, así que los demás caracteres siempre vienen antes: nunca aparece
+un ejemplo con un kanji de un nivel posterior.
+
+Eso no basta, porque dentro de un nivel las cartas se abren juntas: «viene
+antes» no es «ya lo sabes». Al mostrar los ejemplos se descartan además las
+palabras con algún kanji que todavía no se ha presentado. Estudiando 社 con
+solo N5 visto, 会社 se cae —会 es de N4— y quedan 入社 y 出社, aunque 会社 sea
+la palabra más frecuente de las tres: fijar un carácter con otro
+desconocido no fija nada.
+
+Si el filtro los deja todos fuera se muestran los que hay. Un ejemplo con un
+carácter por conocer es peor que uno limpio, pero mejor que ninguno.
+
 ## Frases de ejemplo
 
 Cada kanji trae una frase corta donde aparece en uso, con su traducción y
@@ -390,6 +434,13 @@ todos los trazos tardan lo mismo independientemente de su tamaño.
 
 Los 2 MB de trazados viven en el proceso principal y se sirven por petición,
 para no cargarlos enteros en el renderer solo por mostrar un kanji.
+
+Debajo de la animación va la **secuencia entera de un vistazo**: una casilla
+por trazo, cada una con lo escrito hasta ahí y el trazo que entra en color.
+La animación enseña el orden pero es fugaz, y para comparar el paso tres con
+el cuatro había que volver a lanzarla; los libros de kanji ponen la columna
+de estados uno al lado de otro por lo mismo. El cuadro lleva la retícula
+punteada en cruz del papel de caligrafía, igual que el de escribir a mano.
 
 ## Cartas apartadas
 

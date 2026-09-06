@@ -5,6 +5,7 @@ import { fsrs, generatorParameters, State, type Card, type Grade } from 'ts-fsrs
 import { HIRAGANA, KATAKANA } from '../src/data/kana'
 import VOCAB from '../src/data/vocab.json'
 import { tokenizeKana } from '../src/lib/tokenize'
+import { segment, type Part, type Readings } from '../src/lib/furigana'
 import KANJI from '../src/data/kanji.json'
 import KANJI_WORDS from '../src/data/kanji-words.json'
 // El trazado vive en el proceso principal y se sirve por petición: son
@@ -1404,6 +1405,7 @@ export function kanjiDetail(glyph: string): KanjiDetail | null {
       word: w.word,
       reading: w.reading,
       meaning: w.meaning,
+      parts: segment(w.word, w.reading, readingsOf),
       progress: summarize(w),
     })),
   }
@@ -1715,15 +1717,64 @@ export function lessonsRemaining(slug: string): number {
   return Math.min(available, newRemainingToday(slug))
 }
 
-/** Palabras de ejemplo de un kanji, para enseñarlas junto al carácter. */
-export function wordsForKanji(glyph: string): { word: string; reading: string; meaning: string }[] {
-  return db
+/** Lecturas de cada kanji, para repartirlas dentro de las palabras. */
+const READINGS = new Map<string, Readings>(
+  (KANJI as { k: string; on?: string[]; kun?: string[] }[]).map((k) => [
+    k.k,
+    { on: k.on ?? [], kun: k.kun ?? [] },
+  ]),
+)
+const readingsOf = (k: string) => READINGS.get(k)
+
+export interface ExampleWord {
+  word: string
+  reading: string
+  meaning: string
+  /** La lectura repartida entre los caracteres, o null si no admite reparto. */
+  parts: Part[] | null
+}
+
+/** Los kanji que ya se han presentado alguna vez. */
+function studiedKanji(): Set<string> {
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT i.glyph FROM item i
+       JOIN deck d ON d.id = i.deck_id AND d.kind = 'kanji'
+       JOIN card c ON c.item_id = i.id AND c.card_type = 'meaning'
+       WHERE i.block != 'word' AND (c.state > 0 OR c.presented_at IS NOT NULL)`,
+    )
+    .all() as { glyph: string }[]
+  return new Set(rows.map((r) => r.glyph))
+}
+
+/**
+ * Palabras de ejemplo de un kanji, para enseñarlas junto al carácter.
+ *
+ * El generador ya garantiza que los demás caracteres vienen antes en el
+ * orden de estudio, pero dentro de un nivel las cartas se abren juntas:
+ * «viene antes» no es «ya lo sabes». Aquí se descartan las palabras con
+ * algún kanji que todavía no se ha presentado, y solo si eso las deja
+ * todas fuera se muestran las que hay — mejor un ejemplo con un carácter
+ * desconocido que ninguno.
+ */
+export function wordsForKanji(glyph: string): ExampleWord[] {
+  const rows = db
     .prepare(
       `SELECT i.glyph AS word, i.reading, i.meaning
        FROM item i WHERE i.block = 'word' AND i.row_key = ?
-       ORDER BY i.position LIMIT 4`,
+       ORDER BY i.position`,
     )
     .all(glyph) as { word: string; reading: string; meaning: string }[]
+
+  const studied = studiedKanji()
+  const clean = rows.filter((r) =>
+    [...r.word].every((c) => c === glyph || !READINGS.has(c) || studied.has(c)),
+  )
+
+  return (clean.length ? clean : rows).slice(0, 4).map((r) => ({
+    ...r,
+    parts: segment(r.word, r.reading, readingsOf),
+  }))
 }
 
 // ------------------------------------- explorador de kana y vocabulario

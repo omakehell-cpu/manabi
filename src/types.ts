@@ -1,3 +1,15 @@
+import type { Part as FuriganaPart } from './lib/furigana'
+
+export type { FuriganaPart }
+
+/** Una palabra de ejemplo con su lectura ya repartida entre los caracteres. */
+export interface ExampleWord {
+  word: string
+  reading: string
+  meaning: string
+  parts: FuriganaPart[] | null
+}
+
 export type CardType =
   | 'recognition'
   | 'recall'
@@ -74,7 +86,14 @@ export interface KanjiDetail extends KanjiBrowseItem {
   freq: number
   grade: number
   nextDue: string | null
-  words: { word: string; reading: string; meaning: string; progress: KanjiProgress }[]
+  words: {
+    word: string
+    reading: string
+    meaning: string
+    /** La lectura repartida entre los caracteres, o null si no se puede. */
+    parts: FuriganaPart[] | null
+    progress: KanjiProgress
+  }[]
 }
 
 export interface SimpleBrowseItem {
@@ -167,7 +186,7 @@ export interface ManabiApi {
   markPresented(ids: number[]): Promise<void>
   lessonBatch(): Promise<number>
   setLessonBatch(v: number): Promise<number>
-  wordsForKanji(glyph: string): Promise<{ word: string; reading: string; meaning: string }[]>
+  wordsForKanji(glyph: string): Promise<ExampleWord[]>
   sentenceFor(glyph: string): Promise<{ japanese: string; spanish: string } | null>
   componentsOf(glyph: string): Promise<KanjiComponent[]>
   retention(): Promise<number>

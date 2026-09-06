@@ -6,6 +6,9 @@ import StrokeOrder from './StrokeOrder'
 import Handwriting from './Handwriting'
 import { FORMS } from '../lib/conjugation'
 import Components from './Components'
+import Furigana from './Furigana'
+import StrokeSteps from './StrokeSteps'
+import type { ExampleWord } from '../types'
 
 interface KanjiAlt {
   on?: string[]
@@ -36,7 +39,7 @@ interface Props {
  * se muestra todo lo que hace falta saber y después se examina.
  */
 export default function LessonCard({ card, position, total, showStrokes, onNext }: Props) {
-  const [words, setWords] = useState<{ word: string; reading: string; meaning: string }[]>([])
+  const [words, setWords] = useState<ExampleWord[]>([])
   const [sentence, setSentence] = useState<{ japanese: string; spanish: string } | null>(null)
   const [writing, setWriting] = useState(false)
 
@@ -62,6 +65,13 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
   }, [card.glyph, isKanji])
 
   useEffect(() => setWriting(false), [card.cardId])
+
+  // Las lecturas de la ficha son una lista muerta hasta que se ve cuál
+  // suena en cada ejemplo: チュウ en 中学校 y ジュウ en 一日中. Se marcan
+  // las que aparecen abajo, del mismo color que llevan sobre la palabra.
+  const used = new Set(
+    words.flatMap((w) => (w.parts ?? []).filter((p) => p.text === card.glyph && p.source).map((p) => p.source!)),
+  )
 
   // Los yōon (きゃ) no existen como una sola entrada en KanjiVG: se dibuja
   // cada carácter por separado. En vocabulario no se dibuja nada: son
@@ -155,8 +165,12 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
             <>
               <p className="text-xl">{(kanji.meanings ?? []).join(', ')}</p>
               <div className="mt-4 space-y-2">
-                {(kanji.on ?? []).length > 0 && <Readings label="ON" list={kanji.on!} />}
-                {(kanji.kun ?? []).length > 0 && <Readings label="KUN" list={kanji.kun!} />}
+                {(kanji.on ?? []).length > 0 && (
+                  <Readings label="ON" list={kanji.on!} used={used} />
+                )}
+                {(kanji.kun ?? []).length > 0 && (
+                  <Readings label="KUN" list={kanji.kun!} used={used} />
+                )}
               </div>
             </>
           ) : (
@@ -192,6 +206,14 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
       </div>
       )}
 
+      {/* La secuencia entera de un vistazo, para poder comparar un paso con
+          el siguiente sin volver a lanzar la animación. */}
+      {showStrokes && !writing && strokeChars.length === 1 && (
+        <div className="mt-6 w-full max-w-lg">
+          <StrokeSteps glyph={strokeChars[0]} />
+        </div>
+      )}
+
       {/* Escribirlo una vez al conocerlo fija mucho más que solo verlo. */}
       {strokeChars.length === 1 && (
         <button
@@ -219,8 +241,7 @@ export default function LessonCard({ card, position, total, showStrokes, onNext 
                 key={w.word}
                 className="flex items-baseline gap-3 rounded-lg bg-surface px-4 py-2 text-sm"
               >
-                <span className="jp text-lg">{w.word}</span>
-                <span className="jp text-muted">{w.reading}</span>
+                <Furigana word={w.word} reading={w.reading} parts={w.parts} focus={card.glyph} />
                 <Speaker text={w.word} />
                 <span className="ml-auto text-right text-muted">{w.meaning}</span>
               </li>
@@ -259,14 +280,28 @@ export function ExampleSentence({
   )
 }
 
-function Readings({ label, list }: { label: string; list: string[] }) {
+function Readings({
+  label,
+  list,
+  used,
+}: {
+  label: string
+  list: string[]
+  /** Lecturas que suenan en alguna de las palabras de ejemplo. */
+  used?: Set<string>
+}) {
   return (
     <div className="flex items-start gap-3">
       <span className="mt-1.5 w-8 shrink-0 text-xs tracking-wide text-muted">{label}</span>
       <div className="flex flex-wrap items-center gap-1">
         {list.map((r) => (
-          <span key={r} className="flex items-center rounded-md bg-raised/60 pl-2">
-            <span className="jp text-lg">{r}</span>
+          <span
+            key={r}
+            className={`flex items-center rounded-md pl-2 ${
+              used?.has(r) ? 'bg-warn/10 ring-1 ring-warn/30' : 'bg-raised/60'
+            }`}
+          >
+            <span className={`jp text-lg ${used?.has(r) ? 'text-warn' : ''}`}>{r}</span>
             <Speaker text={cleanReading(r)} label={r} />
           </span>
         ))}
